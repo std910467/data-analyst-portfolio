@@ -14,7 +14,11 @@ MODIFY COLUMN review_id VARCHAR(100),
 MODIFY COLUMN order_id VARCHAR(100),
 MODIFY COLUMN review_comment_message TEXT;
 -- 清空olist_order_reviews_dataset資料
+
 TRUNCATE TABLE olist_order_reviews_dataset;
+TRUNCATE TABLE olist_customers_dataset;
+
+
 -- 結論用DBeaver匯入失敗，欄位長度好了，但評論欄的資料有ENTER換行，DBeaver 的 CSV 匯入器誤把留言裡的「換行」當成下一筆資料的開始，導致整筆資料發生「大錯位」
 -- 建議用Pandas匯入
 
