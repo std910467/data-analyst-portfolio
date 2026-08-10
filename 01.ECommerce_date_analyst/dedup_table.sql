@@ -25,3 +25,6 @@ DROP TABLE olist_order_items_dataset ;
 
 -- 把乾淨的表改回原來的名字
 RENAME TABLE olist_order_items_dataset_clean TO olist_order_items_dataset;
+
+
+

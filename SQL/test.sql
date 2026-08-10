@@ -14,6 +14,8 @@ limit 10;
 
 
 
+
+
 select customer_id , sum(amount) as total_amount
 from orders
 group by customer_id ;

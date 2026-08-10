@@ -86,12 +86,15 @@ group by first_month
 order by month ;
 
 /*============================================
- create mart_month_customer_segment---顧客分類
+ create mart_monthly_customer_segment---顧客分類
  考量資料日期是取至2018-09，計算R的時候用 2018-09-01
   ==============================================*/
 
 -- create mart_month_customer_segment，因為根據上面資料來看 回購率過低(1%)，f看不出價值，僅評估R_M
-create table mart_month_customer_segment as
+drop table mart_monthly_customer_segment;
+
+
+create table mart_monthly_customer_segment as
 with customer_order as (
 	select 	str_to_date(DATE_FORMAT(order_purchase_timestamp, "%Y-%m-01"), "%Y-%m-%d") as order_month,
 			order_purchase_timestamp ,
@@ -117,6 +120,11 @@ customer_RFM_Mrate as(
 			PERCENT_RANK() OVER (ORDER BY M DESC) AS M_rank_pct
 	from customer_RFM 
 ),
+month_revenue as(
+	select first_order_month , sum(M) as revenue
+	from customer_RFM_Mrate
+	group by first_order_month
+),
 customer_seg as(
 	select *,
 			case 	when R<180 and M_rank_pct <= 0.2 then '近期高價值客'
@@ -124,22 +132,37 @@ customer_seg as(
 					when R<180 and M_rank_pct > 0.2 then '近期大眾'
 					else '遠期大眾' end as segment
 	from customer_RFM_Mrate
+),
+month_seg as (
+	select first_order_month , 
+			count(case when segment = '近期高價值客' then 1 end ) as 近期高價值客,
+			sum(case when segment = '近期高價值客' then M end ) as 近期高價值客_消費,
+			count(case when segment = '遠期高價值客' then 1 end ) as 遠期高價值客,
+			sum(case when segment = '遠期高價值客' then M end ) as 遠期高價值客_消費,
+			count(case when segment = '近期大眾' then 1 end ) as 近期大眾,
+			sum(case when segment = '近期大眾' then M end ) as 近期大眾_消費,
+			count(case when segment = '遠期大眾' then 1 end ) as 遠期大眾,
+			sum(case when segment = '遠期大眾' then M end ) as 遠期大眾_消費
+	from customer_seg 
+	group by first_order_month
 )
-select first_order_month as month, 
-		count(case when segment = '近期高價值客' then 1 end ) as 近期高價值客,
-		count(case when segment = '遠期高價值客' then 1 end ) as 遠期高價值客,
-		count(case when segment = '近期大眾' then 1 end ) as 近期大眾,
-		count(case when segment = '遠期大眾' then 1 end ) as 遠期大眾
-from customer_seg 
-group by first_order_month
+select  mg.first_order_month as month,
+		mg.近期高價值客 , 	round(mg.近期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期高價值客_消費比,
+		mg.遠期高價值客 ,	round(mg.遠期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 遠期高價值客_消費比,
+		mg.近期大眾	, 	round(mg.近期大眾_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期大眾_消費比,
+		mg.遠期大眾	,	round(mg.遠期大眾_消費*1.0/nullif(mr.revenue,0) ,2)	as 遠期大眾_消費比
+from month_seg as mg
+left join month_revenue as mr 
+on mg.first_order_month = mr.first_order_month
 order by month;
 	
 /*============================================
- create mart_month_product--產品
+ create mart_monthly_product--產品
   ==============================================*/
+drop table mart_monthly_product;
 
 
-create table mart_month_product as
+create table mart_monthly_product as
 with product_month as ( 
 	select 	product_category,
 			str_to_date(DATE_FORMAT(order_purchase_timestamp, "%Y-%m-01"), "%Y-%m-%d") as order_month,
@@ -163,7 +186,7 @@ with product_month as (
 		from product_sum
 		order by order_month , pro_revenue_row
 		)
-select	order_month ,
+select	order_month as month ,
 		max(case when pro_revenue_row=1 then product_category end) as NO_1_product,
 		max(case when pro_revenue_row=2 then product_category end) as NO_2_product,
 		max(case when pro_revenue_row=3 then product_category end) as NO_3_product,
