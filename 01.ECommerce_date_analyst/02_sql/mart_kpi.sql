@@ -91,8 +91,6 @@ order by month ;
   ==============================================*/
 
 -- create mart_month_customer_segment，因為根據上面資料來看 回購率過低(1%)，f看不出價值，僅評估R_M
-drop table mart_monthly_customer_segment;
-
 
 create table mart_monthly_customer_segment as
 with customer_order as (
@@ -119,11 +117,12 @@ customer_RFM_Mrate as(
 	select 	*,
 			PERCENT_RANK() OVER (ORDER BY M DESC) AS M_rank_pct
 	from customer_RFM 
-),
-month_revenue as(
+)
+-- month_revenue as(
 	select first_order_month , sum(M) as revenue
 	from customer_RFM_Mrate
 	group by first_order_month
+	order by first_order_month;
 ),
 customer_seg as(
 	select *,
@@ -147,6 +146,7 @@ month_seg as (
 	group by first_order_month
 )
 select  mg.first_order_month as month,
+		round(mr.revenue ,2),
 		mg.近期高價值客 , 	round(mg.近期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期高價值客_消費比,
 		mg.遠期高價值客 ,	round(mg.遠期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 遠期高價值客_消費比,
 		mg.近期大眾	, 	round(mg.近期大眾_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期大眾_消費比,
