@@ -1,26 +1,16 @@
 USE olist;
 
--- 確認表格裡面有哪些資料、以及資料型態，
-select * from int_order_summary limit 5;
-describe int_order_summary;
-select distinct order_status from int_order_summary limit 10;
-
-
 -- 計算一下dilivered已送達的，訂單已經完成的部分占多少
 -- 送達率大約97%，後續資料都只針對dilivered的部分計算
 select 	count(*) , 
 		count(case when order_status = "delivered" then 1 end) as delivered,
-		round(count(case when order_status = "delivered" then 1 end)*1.0/count(*),2)
+		round(count(case when order_status = "delivered" then 1 end)*1.0/count(*),4)
 from int_order_summary ios ;	
 
-
--- drop mart_monthly_revenue 如果要重做的話
-DROP TABLE IF exists mart_monthly_revenue;
 /*============================================
  create mart_monthly_revenue---營收
   ==============================================*/
 
--- create mart_monthly_revenue
 create table mart_monthly_revenue as 
 with month_order as ( 
 	select str_to_date(DATE_FORMAT(order_purchase_timestamp, "%Y-%m-01"), "%Y-%m-%d") as order_month,
@@ -52,7 +42,6 @@ select * from month_revenue_prev_growth  order by month
  create mart_monthly_retention---留存
   ==============================================*/
 
--- create mart_monthly_retention
 create table mart_monthly_retention as 
 with month_order_customer as ( 
 	select 	str_to_date(DATE_FORMAT(order_purchase_timestamp, "%Y-%m-01"), "%Y-%m-%d") as order_month,
@@ -88,9 +77,8 @@ order by month ;
 /*============================================
  create mart_monthly_customer_segment---顧客分類
  考量資料日期是取至2018-09，計算R的時候用 2018-09-01
+ 因為根據上面資料來看 回購率過低(1%)，f看不出價值，僅評估R_M
   ==============================================*/
-
--- create mart_month_customer_segment，因為根據上面資料來看 回購率過低(1%)，f看不出價值，僅評估R_M
 
 create table mart_monthly_customer_segment as
 with customer_order as (
@@ -117,12 +105,6 @@ customer_RFM_Mrate as(
 	select 	*,
 			PERCENT_RANK() OVER (ORDER BY M DESC) AS M_rank_pct
 	from customer_RFM 
-)
--- month_revenue as(
-	select first_order_month , sum(M) as revenue
-	from customer_RFM_Mrate
-	group by first_order_month
-	order by first_order_month;
 ),
 customer_seg as(
 	select *,
@@ -132,35 +114,29 @@ customer_seg as(
 					else '遠期大眾' end as segment
 	from customer_RFM_Mrate
 ),
-month_seg as (
-	select first_order_month , 
-			count(case when segment = '近期高價值客' then 1 end ) as 近期高價值客,
-			sum(case when segment = '近期高價值客' then M end ) as 近期高價值客_消費,
-			count(case when segment = '遠期高價值客' then 1 end ) as 遠期高價值客,
-			sum(case when segment = '遠期高價值客' then M end ) as 遠期高價值客_消費,
-			count(case when segment = '近期大眾' then 1 end ) as 近期大眾,
-			sum(case when segment = '近期大眾' then M end ) as 近期大眾_消費,
-			count(case when segment = '遠期大眾' then 1 end ) as 遠期大眾,
-			sum(case when segment = '遠期大眾' then M end ) as 遠期大眾_消費
-	from customer_seg 
-	group by first_order_month
+order_customer_seg as (
+	select co.* , cs.segment
+	from customer_order as co
+	left join customer_seg as cs
+	on co.customer = cs.customer
 )
-select  mg.first_order_month as month,
-		round(mr.revenue ,2),
-		mg.近期高價值客 , 	round(mg.近期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期高價值客_消費比,
-		mg.遠期高價值客 ,	round(mg.遠期高價值客_消費*1.0/nullif(mr.revenue,0) ,2)	as 遠期高價值客_消費比,
-		mg.近期大眾	, 	round(mg.近期大眾_消費*1.0/nullif(mr.revenue,0) ,2)	as 近期大眾_消費比,
-		mg.遠期大眾	,	round(mg.遠期大眾_消費*1.0/nullif(mr.revenue,0) ,2)	as 遠期大眾_消費比
-from month_seg as mg
-left join month_revenue as mr 
-on mg.first_order_month = mr.first_order_month
+select 	order_month as month,
+		round(sum(amount) ,2) as revenue,
+		sum(case when segment="近期高價值客" then 1 end) as 近期高價值客數,
+		round(sum(case when segment="近期高價值客" then amount end) ,2) as 近期高價值客_消費,
+		sum(case when segment="遠期高價值客" then 1 end) as 遠期高價值客數,
+		round(sum(case when segment="遠期高價值客" then amount end) ,2) as 遠期高價值客_消費,
+		sum(case when segment="近期大眾" then 1 end) as 近期大眾,
+		round(sum(case when segment="近期大眾" then amount end) ,2) as 近期大眾_消費,
+		sum(case when segment="遠期大眾" then 1 end) as 遠期大眾,
+		round(sum(case when segment="遠期大眾" then amount end) ,2) as 遠期大眾_消費
+from order_customer_seg
+group by order_month
 order by month;
 	
 /*============================================
  create mart_monthly_product--產品
   ==============================================*/
-drop table mart_monthly_product;
-
 
 create table mart_monthly_product as
 with product_month as ( 
@@ -171,29 +147,19 @@ with product_month as (
 	where 	order_status = "delivered"
 			and order_purchase_timestamp >= '2017-01-01'
   			and order_purchase_timestamp <  '2018-09-01'
-	),
-	product_sum as (
+),
+product_sum as (
 		select 	product_category , order_month , 
 				sum(amount) as pro_revenue
 		from product_month 
 		group by product_category ,order_month
-	),
-	month_product as (
-		select 	product_category , 
-				order_month , 
-				pro_revenue ,
-				row_number() over (partition by order_month order by pro_revenue desc) as pro_revenue_row
-		from product_sum
-		order by order_month , pro_revenue_row
-		)
-select	order_month as month ,
-		max(case when pro_revenue_row=1 then product_category end) as NO_1_product,
-		max(case when pro_revenue_row=2 then product_category end) as NO_2_product,
-		max(case when pro_revenue_row=3 then product_category end) as NO_3_product,
-		round(sum(case when pro_revenue_row<=3 then pro_revenue end)*1.0/sum(pro_revenue),4) as NO1_3_revenue_rate
-from month_product
-group by order_month 
-order by order_month ;
+)
+select 	product_category , 
+		order_month as month, 
+		pro_revenue ,
+		row_number() over (partition by order_month order by pro_revenue desc) as pro_revenue_row
+from product_sum
+order by month , pro_revenue_row;
 
 	
 	
