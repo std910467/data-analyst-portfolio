@@ -1,42 +1,82 @@
-# 02.Equipment_Maintenance_Analysis 
+# 02. Equipment_Maintenance_Analysis
 
 ## 專案說明
-資料夾：
-專案標題：Equipment Failure & Maintenance Analysis
-資料來源：Microsoft Azure Predictive Maintenance
+使用 Microsoft Azure Predictive Maintenance 公開資料，練習工業設備的故障與維運分析。
+
+專案目標是把多表維運資料（感測、錯誤、維修、故障、設備主檔）整理成可分析的結構，並從中觀察：
+- 哪些機台較常故障
+- 故障集中在哪些零件
+- 不同機型／機齡是否有差異
+- 錯誤與故障隨時間的變化
+
+資料來源為微軟提供的維運練習資料（5 張表），表結構模擬真實維運情境，但非單一工廠原始數據。
+
+這是轉職資料分析的第二個專案，流程同樣是：資料處理 → SQL 建表 → 分析 → 視覺化。
 
 ---
 
 ## 分析內容
+- 機台故障排行與零件故障結構
+- 機型（model）、機齡（age）與故障的關係
+- 錯誤（error）與故障（failure）的分布與趨勢
+- 月度維運概況（故障／維修／錯誤）
+
+（成本、產能等欄位資料中未提供，本專案不進行成本 ROI 分析。）
 
 ---
 
 ## 資料處理
+- 原始表：
+  - `PdM_telemetry`：感測（電壓、轉速、壓力、振動）
+  - `PdM_errors`：錯誤紀錄
+  - `PdM_maint`：維修／零件更換
+  - `PdM_failures`：故障更換
+  - `PdM_machines`：設備主檔（model、age）
+- 時間粒度：先統一到「每日 × 機台」
+- 關聯鍵：`machineID` + 日期
 
 ---
 
 ## SQL 資料表設計
-將所有表格時間粒度統一為每日，
-完成 int_daily_machine_summary中間表
-完成SQL 資料處理。
+
+### 中間表
+- `int_daily_machine_summary`：每日 × 機台  
+  彙總當日感測平均值、維修次數、故障次數、錯誤次數，並帶入機型與機齡
+
+### 分析表（Mart）
+- `mart_machine_failure_summary`：每台機器彙總（誰常壞、零件／錯誤結構）
+- `mart_monthly_failure`：每月 × 機型彙總（趨勢與機型差異）
+
+SQL 階段目前已完成。
 
 ---
 
 ## Python 圖表分析
+**進行中**
 
+預定內容：
+- 零件故障占比、機台故障排行
+- 機型／機齡分組比較
+- 月度故障與錯誤趨勢
+- 故障日與非故障日的感測差異（探索用）
 
 ---
 
 ## BI 儀表板
+**進行中**
+
+預定內容：
+- 維運總覽（故障、錯誤、維修概況）
+- 機台／機型風險與趨勢
 
 ---
 
 ## 使用技術
-- DBeaver(MYSQL)：資料清理、中間表、分析表  
-- Python：部分資料匯入、讀取與繪圖  
-- Power BI：儀表板  
+- DBeaver（MySQL）：資料清理、中間表、分析表
+- Python：讀取資料、分析與繪圖（進行中）
+- Power BI：儀表板（進行中）
 
 ---
 
 ## 結論
-。
+**進行中**（待 Python／BI 完成後補上主要觀察）
