@@ -6,7 +6,7 @@ select * from int_daily_machine_summary
 limit 30;
 -- 檢查資料內容 
 
--- 創造中間表格
+-- 創造機器的綜整表
 CREATE TABLE mart_machine_summary as 
 	select 	machineID ,model,age,
 			avg(d_volt) as y_volt,
