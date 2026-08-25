@@ -7,8 +7,6 @@ from matplotlib.ticker import PercentFormatter
 from pathlib import Path
 from sqlalchemy import create_engine
 
-import seaborn as sns
-
 
 
 # 檔案路徑
@@ -56,7 +54,7 @@ model_summary = (
 
 fig, axes = plt.subplots(1, 3, figsize=(14, 4))
 
-# 1) 故障 / 维修 / 错误
+# 1) 故障 / 維修 / 錯誤
 x = model_summary["model"]
 w = 0.25
 idx = range(len(x))
@@ -69,15 +67,22 @@ axes[0].set_xticklabels(x)
 axes[0].set_title("Avg Failures / Maint / Errors by Model")
 axes[0].legend()
 
-# 2) 感测均值
+# 2) 感測器均值
 axes[1].plot(x, model_summary["avg_volt"], marker="o", label="volt")
-axes[1].plot(x, model_summary["avg_rotate"], marker="o", label="rotate")
 axes[1].plot(x, model_summary["avg_pressure"], marker="o", label="pressure")
 axes[1].plot(x, model_summary["avg_vibration"], marker="o", label="vibration")
 axes[1].set_title("Avg Sensors by Model")
 axes[1].legend()
+axes[1].set_ylabel("Volt / Pressure / Vibration") 
+ax_rotate = axes[1].twinx()
+ax_rotate.plot(x, model_summary["avg_rotate"], marker="o", label="rotate", color="tab:red")
+ax_rotate.set_ylabel("Rotate (RPM)")
+lines_left, labels_left = axes[1].get_legend_handles_labels()
+lines_right, labels_right = ax_rotate.get_legend_handles_labels()
+axes[1].legend(lines_left + lines_right, labels_left + labels_right, loc="upper right")
 
-# 3) 机台数、机龄
+
+# 3) 機台數、機齡
 axes[2].bar(x, model_summary["machine_cnt"], alpha=0.7, label="machine_cnt")
 axes[2].set_ylabel("machine_cnt")
 ax2 = axes[2].twinx()
@@ -88,3 +93,30 @@ axes[2].set_title("Machine Count & Avg Age")
 plt.tight_layout()
 plt.show()
 plt.close()
+
+
+
+
+# fig, ax = plt.subplots(figsize=(8, 5))
+
+# # 1. 主軸（左側）：繪製 volt, pressure, vibration
+# # ax.plot(x, model_summary["avg_volt"], marker="o", label="volt")
+# # ax.plot(x, model_summary["avg_pressure"], marker="o", label="pressure")
+# ax.plot(x, model_summary["avg_vibration"], marker="o", label="vibration")
+# ax.set_title("Avg Sensors by Model")
+# ax.set_ylabel("Volt / Pressure / Vibration")
+
+# # 2. 副軸（右側）：繪製 rotate
+# ax_rotate = ax.twinx()
+# ax_rotate.plot(x, model_summary["avg_rotate"], marker="o", label="rotate", color="tab:red")
+# ax_rotate.set_ylabel("Rotate (RPM)")
+
+# # 3. 合併圖例並顯示
+# lines_left, labels_left = ax.get_legend_handles_labels()
+# lines_right, labels_right = ax_rotate.get_legend_handles_labels()
+# ax.legend(lines_left + lines_right, labels_left + labels_right, loc="upper right")
+
+# plt.tight_layout()
+# plt.show()
+# plt.close()
+# %%
