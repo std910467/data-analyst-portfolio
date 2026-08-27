@@ -25,12 +25,6 @@ def read_table(table_name, order_by=None):
 
 df_monthly_model_failure = read_table("mart_monthly_model_failure", order_by="month")
 
-df_monthly_model_failure["total_maint"] = (
-    df_monthly_model_failure["comp1_times"] + 
-    df_monthly_model_failure["comp2_times"] + 
-    df_monthly_model_failure["comp3_times"] + 
-    df_monthly_model_failure["comp4_times"]
-)
 
 df_monthly_model_failure.head()
 df_monthly_model_failure.dtypes
@@ -44,7 +38,6 @@ month_summary = (
     )
     .sort_values("month", ascending=True)
 )
-
 
 
 fig, ax = plt.subplots(figsize=(10, 5))
@@ -61,7 +54,7 @@ ax.bar([i + w for i in idx], month_summary["sum_errors"], width=w, label="sum_er
 
 # 5. 設定 X 軸刻度與標籤
 ax.set_xticks(idx)
-ax.set_xticklabels(x, rotation=45)  # 加 rotation=45 可防止月份文字重疊
+ax.set_xticklabels([str(i)[:7] for i in x], rotation=45)  # 加 rotation=45 可防止月份文字重疊
 ax.set_title("Total Failures / Maint / Errors by Month")
 ax.set_ylabel("Count")
 ax.legend()

@@ -14,12 +14,14 @@ SELECT * FROM pdm_telemetry
 LIMIT 10; -- 遙測資料 每小時1筆、電壓、轉速、壓力、震動
 
 -- 檢查資料內容 
-select min(datetime) , max(datetime) FROM pdm_telemetry; -- 資料涵蓋1年
+select min(datetime) , max(datetime) FROM pdm_telemetry; -- 資料涵蓋1年，但只到2016-01-01未足月，資料僅使用2015年
+select min(datetime) , max(datetime) FROM pdm_maint; -- 維修資料是從2014-06-01開始到2016-01-01，為與其他同步資料故僅使用2015年
+
 
 select distinct comp from pdm_maint ; -- 確認維修只有 comp1~4
 select distinct failure from pdm_failures ; -- 確認故障只有 comp1~4
 select distinct errorID from pdm_errors ; -- 確認告警只有 error1~5
-
+ 
 -- 創造中間表格
 CREATE TABLE int_daily_machine_summary as 
 with daily_telemetry as (
@@ -30,6 +32,7 @@ with daily_telemetry as (
 			avg(pressure) as d_pressure,
 			avg(vibration) as d_vibration
 	from pdm_telemetry
+	where datetime < '2016-01-01'
 	group by DATE(datetime), machineID
 	),
 	daily_mach_telemetry as (
@@ -93,6 +96,11 @@ select *
 from int_daily_machine_summary idms  
 limit 20;
 
+-- 檢查筆數
+select count(*)
+from int_daily_machine_summary; -- 100*365天=36500 無誤
+
+-- 檢查有沒有 NULL
 SELECT 
     SUM(d_volt IS NULL) ,
     SUM(d_rotate IS NULL) ,
@@ -112,7 +120,6 @@ SELECT
     SUM(error2_times IS NULL) ,
     SUM(error3_times IS NULL) ,
     SUM(error4_times IS NULL) ,
-    SUM(error5_times IS NULL) 
+    SUM(error5_times IS NULL)
 FROM azure_pdm.int_daily_machine_summary;
-
 

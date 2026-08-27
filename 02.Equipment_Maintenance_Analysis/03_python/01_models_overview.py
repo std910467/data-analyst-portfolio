@@ -25,12 +25,6 @@ def read_table(table_name, order_by=None):
 
 df_machine_summary = read_table("mart_machine_summary", order_by="machineID")
 
-df_machine_summary["total_maint"] = (
-    df_machine_summary["comp1_times"] + 
-    df_machine_summary["comp2_times"] + 
-    df_machine_summary["comp3_times"] + 
-    df_machine_summary["comp4_times"]
-)
 
 model_summary = (
     df_machine_summary.groupby("model", as_index=False)
@@ -40,10 +34,10 @@ model_summary = (
         avg_failures=("total_failures", "mean"),
         avg_maint=("total_maint", "mean"),
         avg_errors=("total_errors", "mean"),
-        avg_volt=("y_volt", "mean"),
-        avg_rotate=("y_rotate", "mean"),
-        avg_pressure=("y_pressure", "mean"),
-        avg_vibration=("y_vibration", "mean"),
+        avg_volt=("avg_volt", "mean"),
+        avg_rotate=("avg_rotate", "mean"),
+        avg_pressure=("avg_pressure", "mean"),
+        avg_vibration=("avg_vibration", "mean"),
         sum_failures=("total_failures", "sum"),
         sum_maint=("total_maint", "sum"),
         sum_errors=("total_errors", "sum"),
