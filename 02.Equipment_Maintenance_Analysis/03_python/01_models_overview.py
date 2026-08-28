@@ -58,6 +58,10 @@ axes[0].bar(idx, model_summary["avg_maint"], width=w, label="avg_maint")
 axes[0].bar([i + w for i in idx], model_summary["avg_errors"], width=w, label="avg_errors")
 axes[0].set_xticks(list(idx))
 axes[0].set_xticklabels(x)
+# 拉高Y軸
+max_val = max(model_summary[["avg_errors","avg_maint","avg_failures"]].max())
+axes[0].set_ylim(0, max_val * 1.25)
+
 axes[0].set_title("Avg Failures / Maint / Errors by Model")
 axes[0].legend()
 
@@ -68,6 +72,11 @@ axes[1].plot(x, model_summary["avg_vibration"], marker="o", label="vibration")
 axes[1].set_title("Avg Sensors by Model")
 axes[1].legend()
 axes[1].set_ylabel("Volt / Pressure / Vibration") 
+# 拉高Y軸
+max_val = max(model_summary[["avg_volt","avg_pressure","avg_vibration"]].max())
+axes[1].set_ylim(0, max_val * 1.5)
+
+
 ax_rotate = axes[1].twinx()
 ax_rotate.plot(x, model_summary["avg_rotate"], marker="o", label="rotate", color="tab:red")
 ax_rotate.set_ylabel("Rotate (RPM)")
