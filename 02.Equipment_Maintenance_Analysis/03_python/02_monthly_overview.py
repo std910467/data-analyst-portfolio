@@ -42,17 +42,29 @@ month_summary = (
 
 fig, ax = plt.subplots(figsize=(10, 5))
 
-# 3. 設定 X 軸與柱狀圖寬度
+# 設定 X 軸與柱狀圖寬度
 x = month_summary["month"]
 w = 0.25
 idx = list(range(len(x)))
 
-# 4. 繪製並列柱狀圖 (修正為 ax，並讀取正確的 sum_ 欄位)
-ax.bar([i - w for i in idx], month_summary["sum_failures"], width=w, label="sum_failures")
-ax.bar(idx, month_summary["sum_maint"], width=w, label="sum_maint")
-ax.bar([i + w for i in idx], month_summary["sum_errors"], width=w, label="sum_errors")
+# 繪製並列柱狀圖 (修正為 ax，並讀取正確的 sum_ 欄位)
+b1 = ax.bar([i - w for i in idx], month_summary["sum_failures"], width=w, label="sum_failures")
+b2 = ax.bar(idx, month_summary["sum_maint"], width=w, label="sum_maint")
+b3 = ax.bar([i + w for i in idx], month_summary["sum_errors"], width=w, label="sum_errors")
 
-# 5. 設定 X 軸刻度與標籤
+# 計算平均、並畫上對應的虛線
+mean_fail = month_summary["sum_failures"].mean()
+mean_maint = month_summary["sum_maint"].mean()
+mean_err = month_summary["sum_errors"].mean()
+ax.axhline(mean_fail, color=b1[0].get_facecolor(), linestyle="--", linewidth=1.5, alpha=0.7, label="_nolegend_")
+ax.axhline(mean_maint, color=b2[0].get_facecolor(), linestyle="--", linewidth=1.5, alpha=0.7, label="_nolegend_")
+ax.axhline(mean_err, color=b3[0].get_facecolor(), linestyle="--", linewidth=1.5, alpha=0.7, label="_nolegend_")
+
+# 拉高Y軸
+max_val = max(month_summary[["sum_failures", "sum_maint", "sum_errors"]].max())
+ax.set_ylim(0, max_val * 1.25)
+
+# 設定 X 軸刻度與標籤
 ax.set_xticks(idx)
 ax.set_xticklabels([str(i)[:7] for i in x], rotation=45)  # 加 rotation=45 可防止月份文字重疊
 ax.set_title("Total Failures / Maint / Errors by Month")
@@ -60,8 +72,12 @@ ax.set_ylabel("Count")
 ax.legend()
 
 plt.tight_layout()
-plt.show()
+plt.savefig(BASE_DIR.parent / "05_outputs/02_monthly_overview.png",
+    dpi=300, 
+    bbox_inches="tight", 
+)
 plt.close()
+
 
 
 

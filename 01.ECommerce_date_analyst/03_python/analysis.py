@@ -248,6 +248,7 @@ plt.savefig(BASE_DIR.parent / "05_outputs/04_category_chart.png",
     dpi=300, 
     bbox_inches="tight", 
 )
+plt.close()
 # endregion
 
 # %%

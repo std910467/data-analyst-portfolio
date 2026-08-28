@@ -85,9 +85,11 @@ ax2.set_ylabel("avg_age")
 axes[2].set_title("Machine Count & Avg Age")
 
 plt.tight_layout()
-plt.show()
+plt.savefig(BASE_DIR.parent / "05_outputs/01_models_overview.png",
+    dpi=300, 
+    bbox_inches="tight", 
+)
 plt.close()
-
 
 
 
