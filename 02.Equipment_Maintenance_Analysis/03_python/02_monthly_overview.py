@@ -38,7 +38,7 @@ month_summary = (
     )
     .sort_values("month", ascending=True)
 )
-
+month_summary["sum_failures"].sum()
 
 fig, ax = plt.subplots(figsize=(10, 5))
 

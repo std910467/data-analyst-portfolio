@@ -122,4 +122,3 @@ SELECT
     SUM(error4_times IS NULL) ,
     SUM(error5_times IS NULL)
 FROM azure_pdm.int_daily_machine_summary;
-

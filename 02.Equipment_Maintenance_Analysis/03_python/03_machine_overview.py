@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.colors as colors
+import numpy as np
+from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 from pathlib import Path
 from sqlalchemy import create_engine
@@ -23,39 +25,50 @@ def read_table(table_name, order_by=None):
 
 df_machine_summary = read_table("mart_machine_summary", order_by="total_failures DESC")
 
-# top20=df_machine_summary.head(20).copy()
-# print(top20["model"].value_counts())
-
+# region  前20名故障數機器橫條圖，以及故障零件堆疊橫條圖
 plot_df = df_machine_summary.head(20).copy()
+plot_df["machineID"] = plot_df["machineID"].astype(str)
+plot_df = plot_df.sort_values("total_failures", ascending=True)
 model_colors = {
-    "model1": "#3B6CBA",
-    "model2": "#55A868",
-    "model3": "#C44E52",
-    "model4": "#8172B3",
+    "model1": "#1f77b4",  
+    "model2": "#ff7f0e",  
+    "model3": "#2ca02c",  
+    "model4": "#9467bd",  
+}
+model_bar_colors = plot_df["model"].map(model_colors)
+comp_colors = {
+    "comp1": "#8c564b",  # 棕
+    "comp2": "#e377c2",  # 粉
+    "comp3": "#7f7f7f",  # 灰
+    "comp4": "#bcbd22",  # 橄欖
 }
 
-colors = plot_df["model"].map(model_colors)
+comps = ["comp1_failure", "comp2_failure", "comp3_failure", "comp4_failure"]
+comp_labels = ["comp1", "comp2", "comp3", "comp4"]
+comp_colors = [comp_colors["comp1"],comp_colors["comp2"],comp_colors["comp3"],comp_colors["comp4"]]
 
-plt.figure(figsize=(10, 6))
-bars = plt.barh(
-    plot_df["machineID"].astype(str),
-    plot_df["total_failures"],
-    color=colors
+fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
+
+# 左：總故障（顏色 = model）
+axes[0].barh(plot_df["machineID"], plot_df["total_failures"], color=model_bar_colors)
+axes[0].set_xlabel("total_failures")
+axes[0].set_title("Top 20 by Total Failures")
+axes[0].legend(
+    handles=[Patch(facecolor=model_colors[m], label=m)
+             for m in model_colors if m in set(plot_df["model"])],
+    title="model",
+    loc="lower right",
 )
-plt.gca().invert_yaxis()  # 故障最多的在上面
 
-plt.xlabel("total_failures")
-plt.ylabel("machineID")
-plt.title("Top 20 Machines by Failures (color = model)")
+# 右：零件堆疊
+left = np.zeros(len(plot_df))
+for col, lab, c in zip(comps, comp_labels, comp_colors):
+    axes[1].barh(plot_df["machineID"], plot_df[col], left=left, color=c, label=lab)
+    left += plot_df[col].values
 
-# 圖例：依 model 建 proxy
-from matplotlib.patches import Patch
-legend_elements = [
-    Patch(facecolor=model_colors[m], label=m)
-    for m in model_colors
-    if m in set(plot_df["model"])
-]
-plt.legend(handles=legend_elements, title="model")
+axes[1].set_xlabel("failures")
+axes[1].set_title("Failure Breakdown by Component")
+axes[1].legend(title="component", loc="lower right")
 
 plt.tight_layout()
 plt.savefig(BASE_DIR.parent / "05_outputs/03_machine_overview.png",
@@ -63,4 +76,6 @@ plt.savefig(BASE_DIR.parent / "05_outputs/03_machine_overview.png",
     bbox_inches="tight", 
 )
 plt.close()
+# endregion
+
 # %%
