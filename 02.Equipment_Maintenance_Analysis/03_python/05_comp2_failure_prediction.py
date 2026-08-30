@@ -63,9 +63,6 @@ df_ctl = pd.DataFrame(ctl_records)
 df_exp.head()
 df_ctl.head()
 
-sensor_cols 
-count_cols
-
 ((df_exp[sensor_cols]- df_ctl[sensor_cols ]) / df_ctl[sensor_cols ]).mean()
 
 # 計算變化幅度sensor用變化率、error用平均數的差異。
@@ -126,7 +123,7 @@ for bar in bars2:
 
 plt.tight_layout()
 plt.savefig(
-    BASE_DIR.parent / "05_outputs/05_pre_failure_Change.png",
+    BASE_DIR.parent / "05_outputs/05_pre_comp2_failure_Change.png",
     dpi=300,
     bbox_inches="tight"
 )
