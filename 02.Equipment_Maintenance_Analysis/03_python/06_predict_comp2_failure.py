@@ -31,7 +31,7 @@ sensor_cols = ["d_volt", "d_rotate", "d_pressure", "d_vibration"]
 count_cols = ["error1_times", "error2_times", "error3_times", "error4_times", "error5_times"]     
    
 
-
+# 計算近 3 天 (當天與前兩天) 的感測器平均值與 Error 累積總和。
 df_daily[[f"{col}_roll3_mean" for col in sensor_cols]
          ] = df_daily.groupby("machineID")[sensor_cols].transform(
              lambda x: x.rolling(window=3, min_periods=1).mean())
@@ -39,61 +39,125 @@ df_daily[[f"{col}_roll3_sum"  for col in count_cols]
          ]  = df_daily.groupby("machineID")[count_cols].transform(
              lambda x: x.rolling(window=3, min_periods=1).sum())
 
-df_daily["d_rotate_roll3_lag3"] = df_daily.groupby("machineID")[
-    "d_rotate_roll3_mean"].shift(3)
-df_daily["error2_times_roll3_lag3"] = df_daily.groupby("machineID")[
-    "error2_times_roll3_sum"].shift(3)
-df_daily["error3_times_roll3_lag3"] = df_daily.groupby("machineID")[
-    "error3_times_roll3_sum"].shift(3)
+# 將滾動統計值平移3天(Lag 3)，作為歷史對照組基準。
+for col in sensor_cols:
+    roll_col = f"{col}_roll3_mean"
+    df_daily[f"{roll_col}_lag3"] = df_daily.groupby("machineID")[
+        roll_col
+    ].shift(3)
+for col in count_cols:
+    roll_col = f"{col}_roll3_sum"
+    df_daily[f"{roll_col}_lag3"] = df_daily.groupby("machineID")[
+        roll_col
+    ].shift(3)
+
+
+
+# 計算差異_sensor用增加比例
+df_daily["volt_change"] = (
+    df_daily["d_volt_roll3_mean"] - df_daily["d_volt_roll3_mean_lag3"]
+    ) / df_daily["d_volt_roll3_mean_lag3"]
+df_daily["rotate_change"] = (
+    df_daily["d_rotate_roll3_mean"] - df_daily["d_rotate_roll3_mean_lag3"]
+    ) / df_daily["d_rotate_roll3_mean_lag3"]
+df_daily["pressure_change"] = (
+    df_daily["d_pressure_roll3_mean"] - df_daily["d_pressure_roll3_mean_lag3"]
+    ) / df_daily["d_pressure_roll3_mean_lag3"]
+df_daily["vibration_change"] = (
+    df_daily["d_vibration_roll3_mean"]- df_daily["d_vibration_roll3_mean_lag3"]
+    ) / df_daily["d_vibration_roll3_mean_lag3"]
+
+# 計算差異_error用增加數量
+df_daily["error1_change"] = (
+    df_daily["error1_times_roll3_sum"] - df_daily["error1_times_roll3_sum_lag3"])
+df_daily["error2_change"] = (
+    df_daily["error2_times_roll3_sum"] - df_daily["error2_times_roll3_sum_lag3"])
+df_daily["error3_change"] = (
+    df_daily["error3_times_roll3_sum"] - df_daily["error3_times_roll3_sum_lag3"])
+df_daily["error4_change"] = (
+    df_daily["error4_times_roll3_sum"] - df_daily["error4_times_roll3_sum_lag3"])
+df_daily["error5_change"] = (
+    df_daily["error5_times_roll3_sum"] - df_daily["error5_times_roll3_sum_lag3"])
+
+#手動運算區：檢查 標準差、平均值、中位數
+if False:
+    text_target = "volt_change"
+    mean_val = df_daily[text_target].mean()
+    std_val = df_daily[text_target].std()
+    median_val = df_daily[text_target].median()
+    print(f"平均值: {mean_val:.4f}")
+    print(f"標準差: {std_val:.4f}")
+    print(f"中位數: {median_val:.4f}")
 
 
 # 設定預警條件
-cond_rotate = (df_daily["d_rotate_roll3_mean"]-df_daily["d_rotate_roll3_lag3"]
-               )/df_daily["d_rotate_roll3_lag3"] < -0.05
-cond_error2 = df_daily["error2_times_roll3_sum"]-df_daily["error2_times_roll3_lag3"] > 0
-cond_error3 = df_daily["error3_times_roll3_sum"]-df_daily["error3_times_roll3_lag3"] > 0
-# df_daily["warning_signal"] = cond_rotate & cond_error2 & cond_error3
-# 另一種只要error2或3有告警就警示。
-df_daily["warning_signal"] = cond_rotate & (cond_error2 | cond_error3)
+# comp1
+df_daily["warning_comp1"] = (df_daily["volt_change"] > 0.04
+                             ) & (df_daily["error1_change"]>0.5)
+# comp2
+df_daily["warning_comp2"] = (df_daily["rotate_change"] < -0.044
+                             ) & ((df_daily["error2_change"]>0.5) | (df_daily["error3_change"]>0.5))
+# comp3
+df_daily["warning_comp3"] = (df_daily["pressure_change"] > 0.055
+                             ) & (df_daily["error4_change"]>0.5)
+# comp4
+df_daily["warning_comp4"] = (df_daily["vibration_change"] > 0.05
+                             ) & (df_daily["error5_change"]>0.5)
 
-#載入後2天comp2_fail的狀況
-df_daily["comp2_fail_next1"] = df_daily.groupby("machineID")[
-    "comp2_failure"
-].shift(-1)
-df_daily["comp2_fail_next2"] = df_daily.groupby("machineID")[
-    "comp2_failure"
-].shift(-2)
+# 預警結果統計
+results = []
+for comp in ["comp1", "comp2", "comp3", "comp4"]:
+    warning_col = f"warning_{comp}"
+    failure_col = f"{comp}_failure"
 
-# 未來2天內只要有任何一天故障就算 True
-df_daily["comp2_fail_in_next_2days"] = (df_daily["comp2_fail_next1"] > 0) | (
-    df_daily["comp2_fail_next2"] > 0)
+    # 計算統計指標
+    total_warnings = df_daily[warning_col].sum()
+    total_failures = df_daily[failure_col].sum()
 
-#  前2天內只要有任何一天警告就算True
-df_daily["warn_in_past_2days"] = (
-    df_daily.groupby("machineID")["warning_signal"].shift(1) == True) | (
-        df_daily.groupby("machineID")["warning_signal"].shift(2) == True)
+    # 有發出預警後未來 2 天內確實有故障產生 (1)
+    fail_next_1 = df_daily.groupby("machineID")[failure_col].shift(-1).fillna(0) >0
+    fail_next_2 = df_daily.groupby("machineID")[failure_col].shift(-2).fillna(0) >0
+    df_daily["future_failure"] = fail_next_1| fail_next_2    
+    hits = df_daily[df_daily[warning_col] & df_daily["future_failure"]
+                    ].shape[0]
+    precision = (hits / total_warnings * 100) if total_warnings > 0 else 0
 
-# 3. 所有觸發警報的列進行統計
-warnings = df_daily[df_daily["warning_signal"] == True]
-failures = df_daily[df_daily["comp2_failure"] > 0]
-total_failures = failures["comp2_failure"].count()
-caught = failures["warn_in_past_2days"].sum()
+    # 故障前兩天是否有告警
+    warn_prev_1 = df_daily.groupby("machineID")[warning_col].shift(1).fillna(False)
+    warn_prev_2 = df_daily.groupby("machineID")[warning_col].shift(2).fillna(False)
+    has_prior_warning = warn_prev_1 | warn_prev_2
+    recall_hits = df_daily[(df_daily[failure_col]>0) & has_prior_warning
+                           ].shape[0]
+    recall = (recall_hits / total_failures * 100) if total_failures > 0 else 0
+
+    f1_score = ((2 * precision * recall) / (precision + recall)
+                if (precision + recall) > 0
+                else 0
+                )
+
+    results.append(
+        {
+            "component": comp,
+            "warnings": total_warnings,
+            "warnings_hits": hits,
+            "precision": round(precision, 2),
+            "failure": total_failures,
+            "failure_hits": recall_hits,
+            "recall": round(recall, 2),
+            "f1_score": round(f1_score, 2),
+        }
+    )
+
+result_df = pd.DataFrame(results)
+result_df
+#%%
+
+#畫圖
+result_df.set_index("component")[["precision", "recall","f1_score"]].plot(kind="bar")
 
 
-total_warnings = len(warnings)
-hits = warnings["comp2_fail_in_next_2days"].sum()
-precision = (hits / total_warnings) * 100 if total_warnings > 0 else 0
-recall = (
-    (caught/ total_failures) * 100 if total_failures > 0 else 0
-)
-
-# print(f"總警報次數 (Total Warnings) : {total_warnings}")
-# print(f"成功預測到故障次數 (Hits)   : {hits}")
-# print(f"預警精準度 (Precision)      : {precision:.2f}%")
-# print(f"覆蓋率(recall)      : {recall:.2f}%")
-
-metrics = ["Precision", "Recall"]
-values = [precision, recall]
+metrics = ["Precision", "Recall" ,"f1_score"]
+values = [precision, recall,f1_score]
 
 # 畫圖
 plt.figure()
