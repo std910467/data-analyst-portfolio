@@ -149,28 +149,30 @@ for comp in ["comp1", "comp2", "comp3", "comp4"]:
     )
 
 result_df = pd.DataFrame(results)
-result_df
-#%%
 
-#畫圖
-result_df.set_index("component")[["precision", "recall","f1_score"]].plot(kind="bar")
+# 輸出CSV檔案 給BI使用
+result_df.to_csv(
+    BASE_DIR.parent / "05_outputs/06_comp_warning_performance.csv",
+    index=False,
+    encoding="utf-8-sig"
+)
 
-
-metrics = ["Precision", "Recall" ,"f1_score"]
-values = [precision, recall,f1_score]
-
-# 畫圖
-plt.figure()
-plt.bar(metrics, values)
-
-plt.title("Failure Prediction Performance (comp2)")
-for i, v in enumerate(values):
-    plt.text(i, v + 1, f"{v:.2f}%", ha='center')
-
-plt.ylabel("Percentage (%)")
-plt.ylim(0, 100)
+df_plot = result_df.set_index("component")[["precision", "recall", "f1_score"]]
+plt.figure(figsize=(10, 6))
+ax = df_plot.plot(
+    kind="bar",
+    width=0.8  
+)
+plt.title("Failure Prediction Performance by Component", fontsize=14)
+plt.xlabel("Component")
+plt.ylabel("Score (%)")
+plt.ylim(0,120)
+plt.xticks(rotation=0)
+for container in ax.containers:
+    ax.bar_label(container, fmt="%.1f%%", padding=2)
+plt.tight_layout()
 plt.savefig(
-    BASE_DIR.parent / "05_outputs/06_comp2_warning_performance.png",
+    BASE_DIR.parent / "05_outputs/06_failure_prediction_performance_by_component.png",
     dpi=300,
     bbox_inches="tight"
 )
