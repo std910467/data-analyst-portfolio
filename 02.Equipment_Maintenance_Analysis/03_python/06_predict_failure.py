@@ -150,12 +150,12 @@ for comp in ["comp1", "comp2", "comp3", "comp4"]:
 
 result_df = pd.DataFrame(results)
 
-# 輸出CSV檔案 給BI使用
-result_df.to_csv(
-    BASE_DIR.parent / "05_outputs/06_comp_warning_performance.csv",
-    index=False,
-    encoding="utf-8-sig"
-)
+# # 輸出CSV檔案 給BI使用
+# result_df.to_csv(
+#     BASE_DIR.parent / "05_outputs/06_comp_warning_performance.csv",
+#     index=False,
+#     encoding="utf-8-sig"
+# )
 
 df_plot = result_df.set_index("component")[["precision", "recall", "f1_score"]]
 plt.figure(figsize=(10, 6))
