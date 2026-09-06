@@ -45,8 +45,6 @@ UCI Machine Learning Repository - SECOM
 
 ## 目前進度
 
-## 目前進度
-
 ### 第一階段
 第一階段先以單一 Feature 為單位，比較 Pass / Fail 的差異，暫不考慮 Feature 間的交互作用。
 先檢查原始 Feature，若欄位中的有效數值種類只有 1 種（包含其餘為 NaN 的情況），代表該 Feature 沒有可用的變化資訊，因此直接移除。(116欄無效)
@@ -71,3 +69,26 @@ UCI Machine Learning Repository - SECOM
 
 目前先記錄分析結果，不直接以 Cohen's d 作為 Feature 篩選條件。
 
+
+## 隨手筆記
+第一階段，評估一下這資料是不是以風險篩檢為目標。
+
+### 9/6 分析筆記
+
+今天先以單一 Feature 為單位，比較 Pass / Fail 的差異。
+
+- 使用 Cohen's d 將不同尺度的 Feature 標準化後進行比較。
+- 目前沒有 `|d| >= 0.7` 的 Feature，`|d| >= 0.6` 有 2 個、`>= 0.5` 有 5 個、`>= 0.4` 有 15 個。
+- 第一輪人工分析先以前 7 個 Feature 為主，暫時不考慮 Feature 之間的交互作用。
+- 檢查部分低 Cohen's d Feature 時發現極端值可能明顯影響標準差，但若 Pass / Fail 的中心位置仍接近，第一階段先不深入處理 Outlier。
+- 以 Pass 作為正常製程基準，暫時使用 `Pass Mean + Cohen's d × Pass Std` 建立各 Feature 的人工門檻。
+
+將 7 條規則組合後測試：
+- 至少 1 條成立即標記為高風險時，Recall 約 77.8%。
+- 約 45.3% 的產品會被標記，其中不良率（Precision）約 12.2%。
+- 清理後全部資料的不良率約 7.1%，因此目前規則已能將部分不良品集中到較小的檢查範圍，但仍有改善空間。
+
+目前對商業目的的想法也有所調整：
+這個分析不一定要直接取代最終品質檢查，而是可以先利用製程 Feature 做風險篩選。在盡量維持高 Recall、避免漏掉不良品的前提下，降低需要進一步檢查的產品比例。
+
+下一步預計先觀察 7 個 Feature 各自的 Recall、Precision 與誤判情況，再嘗試人工調整各 Feature 的權重與規則。
