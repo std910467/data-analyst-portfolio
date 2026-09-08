@@ -92,3 +92,7 @@ UCI Machine Learning Repository - SECOM
 這個分析不一定要直接取代最終品質檢查，而是可以先利用製程 Feature 做風險篩選。在盡量維持高 Recall、避免漏掉不良品的前提下，降低需要進一步檢查的產品比例。
 
 下一步預計先觀察 7 個 Feature 各自的 Recall、Precision 與誤判情況，再嘗試人工調整各 Feature 的權重與規則。
+
+### 9/8 分析筆記
+Rule-based 第一階段規則設計：
+以高 Recall 為優先，先建立一個 Gatekeeper（門神）盡可能攔截 Fail，再利用其他候選特徵逐步排除門神誤抓的 Pass，以降低最終 Inspection Rate。初步比較 Cohen's d 篩選出的候選特徵後，Feature 510 在高 Recall 區間具有較好的檢查效率，因此進一步測試 Fail quantile 0～0.10 的門檻變化。結果顯示 q=0.01 時，僅由 100% Recall 降至 98.99%（99 個 Fail 中漏掉 1 個），Inspection Rate 則由 98.995% 降至 94.616%，約減少 4.38 個百分點，因此暫定 Feature 510、q=0.01（threshold ≈ 23.124）作為第一階段 Gatekeeper。後續將針對 Gatekeeper 攔截的樣本，利用其餘候選特徵嘗試釋放 False Positive，並觀察降低 Inspection Rate 時造成的 True Positive 損失。
