@@ -89,13 +89,13 @@ effect_df = effect_df.sort_values(
     ascending=False
 )
 
-# 看一下大小的cohen's d(效果量)存在多少筆欄位。
+# 看一下各比例的cohen's d(效果量)存在多少筆欄位。
 for i in range(9, 0, -1):
     threshold = i / 10
     count = (effect_df["abs_cohens_d"] >= threshold).sum()
     print(f"Cohen's d >= {threshold:.1f}：{count} 筆")
 
-#針對abs_cohen's d大於0.5特徵當作設立門檻值的規劃
+#針對abs_cohen's d大於0.5特徵當作設立門檻值，有5筆。
 top_features = effect_df[
     effect_df["abs_cohens_d"] >= 0.5
 ].copy()
@@ -152,10 +152,10 @@ plt.legend()
 plt.grid(alpha=0.3)
 plt.show()
 
-# 第一階段 我打算先找一個主規則，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
-# 從圖來看，特徵501作為第一主規則
-#鎖定 501看 0~0.1之間的看一下檢查率變化
-quantile_list = np.arange(0, 0.101, 0.01)
+# 第一階段 我打算先找一個主特徵，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
+# 從圖來看，特徵510作為第一主規則
+#鎖定 510看 0~0.1之間的看一下檢查率變化
+quantile_list = np.arange(0, 0.101, 0.001)
 result = []
 feature = 510
 for q in quantile_list:
@@ -193,44 +193,24 @@ feature_510_df["avg_inspection_drop"] = (
     (max_rate - feature_510_df["inspection_rate"])
     / feature_510_df["quantile"])
 
-# 看起來0.01不錯，放棄一個fail ，減少4%多的檢查率。
-rule_510 = result_df[
-    (result_df["feature"] == 510) &
-    (result_df["quantile"] == 0.01)
-]
+
+# 把斜率最大的，也就是平均放棄一個fail減少最多檢查率的，當作門檻也就是0.09。
+f510_threshold = feature_510_df.loc[feature_510_df["avg_inspection_drop"].idxmax(), "threshold"]
 threshold_table = pd.DataFrame({
     "feature": [510],
     "role": ["gatekeeper"],
-    "threshold": [rule_510["threshold"].iloc[0]]
+    "threshold": f510_threshold
 })
 
 
-
-
-
-
-
-
-
-
-#針對前面7個差異較大的7個特徵設立門檻
-top_features = effect_df.head(7).copy()
+#計算其他特徵的門檻值，已pass_mean+pass+std為準。
 top_features["threshold"] = (
     top_features["pass_mean"]
-    + top_features["cohens_d"] * top_features["pass_std"]
-)
-
-#假設門檻值是，目標抓到多少不良品。
-threshold_list = []
-for feature in top_features["feature"]:
-    feature = int(feature)
-    threshold = fail_df[feature].quantile(0.25)
-    threshold_list.append(threshold)
-top_features["threshold"] = threshold_list
+    # + top_features["pass_std"]/2
+    )
 
 
-
-#測試一下每個條件自已的準確度
+# region 測試一下TOP特徵的通用門檻值自已的狀況
 rule_result = []
 
 for _, row in top_features.iterrows():
@@ -250,8 +230,8 @@ for _, row in top_features.iterrows():
     # 指標
     recall = TP / (TP + FN)
     precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    coverage = (TP + FP) / len(df_first_round)
-
+    accuracy = (TP + TN) / (TP + FP + FN + TN)
+    inspection_rate = (TP + FP) / len(df_first_round)
     rule_result.append([
         feature,
         threshold,
@@ -261,7 +241,8 @@ for _, row in top_features.iterrows():
         TN,
         recall,
         precision,
-        coverage
+        accuracy,
+        inspection_rate
     ])
 
 rule_df = pd.DataFrame(
@@ -275,27 +256,32 @@ rule_df = pd.DataFrame(
         "TN",
         "recall",
         "precision",
-        "coverage"
+        "accuracy",
+        "inspection_rate"
     ]
 )
-
-print(rule_df)
-
-
+# print(rule_df)
+# endregion
 
 
 
-#用七個門檻規則測試~原始資料看準確度
+#用五個門檻規則測試~原始資料看準確度
 rule_count = pd.Series(0, index=df_first_round.index)
+gatekeeper_rule = (
+    df_first_round[510] >= f510_threshold)
 
-for _, row in top_features.iterrows():
+for _, row in top_features[
+    top_features["feature"] != 510
+    ].iterrows():
     feature = int(row["feature"])
     threshold = row["threshold"]
 
-    rule_count += (df_first_round[feature] > threshold).astype(int)
+    rule_count += (
+        df_first_round[feature] > threshold
+    ).astype(int)
 
-# 至少 3 條規則成立 → 預測 Fail
-pred_fail = rule_count >= 1
+# 510 成立，而且其他 4 個至少 2 個成立
+pred_fail = gatekeeper_rule & (rule_count >= 1)
 
 # 真實結果
 actual_fail = df_first_round["label"] == 1
@@ -311,9 +297,8 @@ TN = (~pred_fail & ~actual_fail).sum()
 # 指標
 recall = TP / (TP + FN)
 precision = TP / (TP + FP)
-
-# 這裡把覆蓋率定義成：規則判定為 Fail 的資料，占全部資料多少
-coverage = (TP + FP) / len(df_first_round)
+accuracy = (TP + TN) / (TP + FP + FN + TN)
+inspection_rate = (TP + FP) / len(df_first_round)
 
 
 print(f"TP：{TP}")
@@ -323,10 +308,10 @@ print(f"TN：{TN}")
 
 print(f"Recall：{recall:.2%}")
 print(f"Precision：{precision:.2%}")
-print(f"標記率：{coverage:.2%}")
+print(f"accuracy：{accuracy:.2%}")
+print(f"inspection_rate：{inspection_rate:.2%}")
 
 labels["label"].value_counts()
-104/(1463+104)
 
 
 
