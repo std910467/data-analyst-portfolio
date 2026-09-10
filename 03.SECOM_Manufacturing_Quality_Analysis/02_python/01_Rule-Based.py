@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+from model_results import save_result
 
 # 檔案路徑
 BASE_DIR = Path(__file__).resolve().parent
@@ -17,7 +18,7 @@ labels = pd.read_csv(
     sep=r"\s+",
     header=None)
 
-labels.columns = ["label","timedata"]
+labels.columns = ["label","timestamp"]
 
 # 移除特徵無變化的欄位(有116欄)
 constant_cols = [
@@ -203,7 +204,7 @@ threshold_table = pd.DataFrame({
 })
 
 
-#計算其他特徵的門檻值，已pass_mean+pass+std為準。
+#計算其他特徵的門檻值，已pass_mean+pass+std/2為準。
 top_features["threshold"] = (
     top_features["pass_mean"]
     # + top_features["pass_std"]/2
@@ -266,9 +267,9 @@ rule_df = pd.DataFrame(
 
 
 #用五個門檻規則測試~原始資料看準確度
-rule_count = pd.Series(0, index=df_first_round.index)
+rule_count = pd.Series(0, index=df.index)
 gatekeeper_rule = (
-    df_first_round[510] >= f510_threshold)
+    df[510] >= f510_threshold)
 
 for _, row in top_features[
     top_features["feature"] != 510
@@ -277,14 +278,14 @@ for _, row in top_features[
     threshold = row["threshold"]
 
     rule_count += (
-        df_first_round[feature] > threshold
+        df[feature] > threshold
     ).astype(int)
 
-# 510 成立，而且其他 4 個至少 2 個成立
+# 510 成立，而且其他 4 個至少 1個成立
 pred_fail = gatekeeper_rule & (rule_count >= 1)
 
 # 真實結果
-actual_fail = df_first_round["label"] == 1
+actual_fail = labels["label"] == 1
 
 
 # TP / FP / FN / TN
@@ -298,7 +299,7 @@ TN = (~pred_fail & ~actual_fail).sum()
 recall = TP / (TP + FN)
 precision = TP / (TP + FP)
 accuracy = (TP + TN) / (TP + FP + FN + TN)
-inspection_rate = (TP + FP) / len(df_first_round)
+inspection_rate = (TP + FP) / (TP + FP + FN + TN)
 
 
 print(f"TP：{TP}")
@@ -311,19 +312,5 @@ print(f"Precision：{precision:.2%}")
 print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
-labels["label"].value_counts()
 
-
-
-
-
-
-
-
-
-feature_59 = result_df[result_df["feature"] == 59].copy()
-
-feature_59[
-    ["quantile", "threshold", "recall",
-     "inspection_rate", "inspection_drop"]
-]
+save_result("Rule-Based", TP, FP, FN, TN)
