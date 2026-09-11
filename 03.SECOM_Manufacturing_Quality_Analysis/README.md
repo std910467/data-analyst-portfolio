@@ -99,3 +99,22 @@ Rule-based 第一階段規則設計：
 
 ### 9/9 筆記
 第一階段以 Feature 510 作為 Gatekeeper，利用 Fail quantile 尋找高 Recall 門檻，最後將 q=0.009 附近作為主規則設定，使第一階段盡可能保留 Fail。第二階段則使用其餘 4 個候選特徵（59、103、348、431）協助排除 Gatekeeper 誤抓的 Pass，並以 pass_mean + pass_std、pass_mean + 0.5*pass_std、pass_mean 三種統一門檻進行測試。結果顯示門檻越寬鬆，Recall 會提高，但 Inspection Rate 也隨之上升。其中以 pass_mean 作為第二階段門檻、且至少一項特徵成立時，最終 TP=90、FP=968、FN=9、TN=326，Recall=90.91%，Inspection Rate=75.95%。目前暫以此作為人工 Rule-based screening baseline，後續可與 ML 模型在相近 Recall 條件下比較 Inspection Rate。
+
+### 9/11筆記
+### 2026/09/11 Logistic Regression 初步測試
+
+開始進入 ML 分類模型測試，第一階段先使用前述 Cohen's d 篩選出的 Top 5 Features（59、103、510、348、431）建立 Logistic Regression baseline。
+
+資料以 80/20 分為 Train / Test，並使用 stratified split 維持 Pass / Fail 原始比例。缺失值以 Train data 的 median 進行填補，再使用 StandardScaler 進行標準化，避免不同 Feature 尺度影響模型訓練。
+
+Logistic Regression 訓練完成後，以 `predict_proba()` 取得 Test data 的 Fail probability，並測試不同 probability threshold。在 Recall ≥ 90% 的條件下，目前選定 threshold = 0.032：
+
+- TP = 19
+- FP = 236
+- FN = 2
+- TN = 57
+- Recall = 90.48%
+- Precision = 7.45%
+- Inspection Rate = 81.21%
+
+目前結果先作為 Logistic Regression Top 5 baseline。由於先前人工 Rule-based 結果使用全資料進行規則建立與評估，兩者目前不能直接作公平比較，後續再統一評估方式。
