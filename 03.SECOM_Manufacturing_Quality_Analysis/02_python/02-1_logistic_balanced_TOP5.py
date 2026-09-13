@@ -35,8 +35,8 @@ top5 = [59, 103, 510, 348, 431]
 x = df[top5]
 y = labels["label"]
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
+x_train, x_test, y_train, y_test = train_test_split(
+    x, y,
     test_size=0.2,
     stratify=y,
     random_state=42
@@ -45,32 +45,54 @@ X_train, X_test, y_train, y_test = train_test_split(
 # 補值 將nan 改成 訓練模型的中位數。
 imputer = SimpleImputer(strategy="median")
 #下面指令，因為會有錯誤(系統衝突之類的)，後面加上；，可以避免某些衝突錯誤。
-imputer.fit(X_train);
-X_train_imputed = imputer.transform(X_train)
-X_test_imputed = imputer.transform(X_test)
+imputer.fit(x_train);
+x_train_imputed = imputer.transform(x_train)
+x_test_imputed = imputer.transform(x_test)
 
 # 標準化
 scaler = StandardScaler()
-scaler.fit(X_train_imputed);
-X_train_scaled = scaler.transform(X_train_imputed)
-X_test_scaled = scaler.transform(X_test_imputed)
+scaler.fit(x_train_imputed);
+x_train_scaled = scaler.transform(x_train_imputed)
+x_test_scaled = scaler.transform(x_test_imputed)
+
 
 #logistic回歸
-model = LogisticRegression()
-model.fit(X_train_scaled, y_train);
+model_balanced = LogisticRegression(class_weight="balanced")
+model_balanced.fit(x_train_scaled, y_train);
 # 看一下訓練出來的係數
-print(model.coef_)
-print(model.intercept_)
+print(model_balanced.coef_)
+print(model_balanced.intercept_)
 
 #測試
-y_prob = model.predict_proba(X_test_scaled)
-print(model.classes_)
+y_prob = model_balanced.predict_proba(x_test_scaled)
+print(model_balanced.classes_)
 fail_prob = y_prob[:, 1]
 
-#目標是recall要9成以上，所以經手動計算門檻值大約小於0.1，用迴圈找最適合的
+#手動測試門檻
+threshold=0.340
+pred_fail = fail_prob >= threshold
+TP = ((pred_fail == True)  & (y_test == 1)).sum()
+FP = ((pred_fail == True)  & (y_test == -1)).sum()
+FN = ((pred_fail == False) & (y_test == 1)).sum()
+TN = ((pred_fail == False) & (y_test == -1)).sum()
+recall = TP / (TP + FN)
+precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+accuracy = (TP + TN) / (TP + FP + FN + TN)
+inspection_rate = (TP + FP) / (TP + FP + FN + TN)
+print(f"threshold：{threshold}")
+print(f"TP：{TP}")
+print(f"FP：{FP}")
+print(f"FN：{FN}")
+print(f"TN：{TN}")
+print(f"Recall：{recall:.2%}")
+print(f"Precision：{precision:.2%}")
+print(f"accuracy：{accuracy:.2%}")
+print(f"inspection_rate：{inspection_rate:.2%}")
+
+#目標是recall要9成以上，所以經手動計算門檻值大約小於0.4，用迴圈找最適合的
 #用迴圈測試，
 result=[]
-for threshold in np.arange(0.01, 0.101, 0.001):
+for threshold in np.arange(0.3, 0.5, 0.001):
 
     pred_fail = fail_prob >= threshold
 
@@ -101,8 +123,9 @@ target_result = logistic_result[
     logistic_result["recall"] >= 0.90
 ]
 
+
 #後來以threshold =0.032為值，結束logistic_
-threshold = 0.032
+threshold = 0.340
 pred_fail = fail_prob >= threshold
 
 TP = ((pred_fail == True)  & (y_test == 1)).sum()
@@ -112,5 +135,4 @@ TN = ((pred_fail == False) & (y_test == -1)).sum()
 
 
 
-
-save_result("logistic_top5", TP, FP, FN, TN)
+save_result("logisti_balance_top5", TP, FP, FN, TN)
