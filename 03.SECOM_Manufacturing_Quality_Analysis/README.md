@@ -118,3 +118,24 @@ Logistic Regression 訓練完成後，以 `predict_proba()` 取得 Test data 的
 - Inspection Rate = 81.21%
 
 目前結果先作為 Logistic Regression Top 5 baseline。由於先前人工 Rule-based 結果使用全資料進行規則建立與評估，兩者目前不能直接作公平比較，後續再統一評估方式。
+
+### 09/14 筆記
+
+Logistic Regression 實驗整理
+延續前一階段 Logistic Regression 測試，本次進一步處理類別不平衡與特徵數量問題。
+
+首先使用 `class_weight="balanced"` 重新訓練 Top 5 Features 模型，在 Recall 維持 90.48% 的情況下，Inspection Rate 由原始 Logistic Regression 的 81.21% 降至 74.84%。
+
+接著移除無變化的 constant features 後，將其餘可用特徵全部加入 Balanced Logistic Regression。經 probability threshold 調整，在 Recall ≥ 90% 的條件下，目前最佳結果為：
+
+- TP = 19
+- FP = 206
+- FN = 2
+- TN = 87
+- Recall = 90.48%
+- Precision = 8.44%
+- Inspection Rate = 71.66%
+
+結果顯示，處理類別不平衡後能明顯降低 Inspection Rate，而使用更多製程特徵後又進一步改善篩檢效率。這也表示部分 Cohen's d 單獨效果量不高的特徵，在多變量 Logistic Regression 中仍可能提供額外的分類資訊。
+
+目前 Logistic Regression 實驗先告一段落，後續將重新整理 Rule-based 方法，以相同 Train / Test 資料切分進行較公平的比較。
