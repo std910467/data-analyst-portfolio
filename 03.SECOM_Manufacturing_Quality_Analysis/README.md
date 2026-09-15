@@ -139,3 +139,26 @@ Logistic Regression 實驗整理
 結果顯示，處理類別不平衡後能明顯降低 Inspection Rate，而使用更多製程特徵後又進一步改善篩檢效率。這也表示部分 Cohen's d 單獨效果量不高的特徵，在多變量 Logistic Regression 中仍可能提供額外的分類資訊。
 
 目前 Logistic Regression 實驗先告一段落，後續將重新整理 Rule-based 方法，以相同 Train / Test 資料切分進行較公平的比較。
+
+
+### 9/15筆記
+### 2026/09/15 Rule-Based Train / Test 驗證
+重新整理原本的 Rule-Based screening 方法，改用與 Logistic Regression 相同的 80/20 stratified Train / Test split，避免使用全資料建立規則後又在相同資料上評估。
+
+本次所有規則皆只使用 Train data 建立，包括缺失值中位數填補、Cohen's d 特徵篩選、Gatekeeper threshold 與第二階段人工門檻調整，最後再將固定後的規則套用至 Test data。
+
+Train data 中以 `|Cohen's d| >= 0.5` 篩選出 3 個候選特徵，並以 Feature 510 作為 Gatekeeper，再搭配另外 2 個特徵進行第二階段篩選。
+
+Test data 最終結果：
+
+- TP = 20
+- FP = 204
+- FN = 1
+- TN = 89
+- Recall = 95.24%
+- Precision = 8.93%
+- Inspection Rate = 71.34%
+
+相同 Test set 下，Balanced Logistic Regression（All Features）為 Recall 90.48%、Inspection Rate 71.66%。本次 Rule-Based 在相近 Inspection Rate 下多捕捉 1 筆 Fail，但 Test set 僅有 21 筆 Fail，因此目前僅視為單次 holdout test 結果，不直接推論 Rule-Based 一定優於 Logistic Regression。
+
+後續再考慮使用不同資料切分或 Cross Validation，觀察結果是否穩定。

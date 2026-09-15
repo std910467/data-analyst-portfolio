@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from model_results import save_result
 from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
 
 
 # 檔案路徑
@@ -36,8 +37,6 @@ df_first_round = df[first_columns]
 x = df_first_round
 y = labels["label"]
 
-x_train.shape
-
 x_train, x_test, y_train, y_test = train_test_split(
     x, y,
     test_size=0.2,
@@ -46,6 +45,7 @@ x_train, x_test, y_train, y_test = train_test_split(
 )
 
 #把nan補上中位數，再把型態array轉成DF
+imputer = SimpleImputer(strategy="median")
 x_train = pd.DataFrame(
     imputer.fit_transform(x_train),
     columns=x_train.columns,
@@ -215,7 +215,7 @@ feature_510_df["avg_inspection_drop"] = (
 
 
 
-# 把斜率最大的，也就是平均放棄一個fail減少最多檢查率的，當作門檻也就是0.09。
+# 把斜率最大的，也就是平均放棄一個fail減少最多檢查率的，當作門檻也就是26.409366。
 f510_threshold = feature_510_df.loc[feature_510_df["avg_inspection_drop"].idxmax(), "threshold"]
 threshold_table = pd.DataFrame({
     "feature": [510],
@@ -228,7 +228,7 @@ threshold_table = pd.DataFrame({
 
 # 510特徵不動，調整另外2個門檻規則，用訓練資料調整為我想要的9成recall
 # 用標準差的倍數來當微調機制+std太高、-std/2太低、-std/3太低。
-# 最後用-std/4.3
+# 最後用-std/4.3，使 Train Recall 達到約 90% 以上
 top_features["threshold"] = (
     top_features["pass_mean"]
     - top_features["pass_std"]/4.3
@@ -327,4 +327,4 @@ print(f"inspection_rate：{inspection_rate:.2%}")
 
 
 
-save_result("Rule-Based_train_Test", TP, FP, FN, TN)
+save_result("rule_based_train_test", TP, FP, FN, TN)
