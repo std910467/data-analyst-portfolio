@@ -23,16 +23,9 @@ labels = pd.read_csv(
 
 labels.columns = ["label","timestamp"]
 
-# 移除特徵無變化的欄位(有116欄)
-constant_cols = [
-    col for col in df.columns
-    if df[col].nunique() <= 1]
-len(constant_cols)
-df = df.drop(columns=constant_cols)
-
-# 依照rule-based，先只看差異最多的5筆特徵。
-top5 = [59, 103, 510, 348, 431]
-x = df[top5]
+# 依照01-2_Rule-Based_Train_Test，先只看差異最多的3筆特徵59、103、510。
+top3 = [59, 103, 510]
+x = df[top3]
 y = labels["label"]
 
 x_train, x_test, y_train, y_test = train_test_split(
@@ -60,21 +53,22 @@ x_test_scaled = scaler.transform(x_test_imputed)
 model_balanced = LogisticRegression(class_weight="balanced")
 model_balanced.fit(x_train_scaled, y_train);
 # 看一下訓練出來的係數
-print(model_balanced.coef_)
-print(model_balanced.intercept_)
+# print(model_balanced.coef_)
+# print(model_balanced.intercept_)
 
 #用訓練參數調整門檻值，目標recall  90%以上
 y_prob = model_balanced.predict_proba(x_train_scaled)
-print(model_balanced.classes_)
+# 看一下模型訓練的對應y區分
+# print(model_balanced.classes_)
 fail_prob = y_prob[:, 1]
 
 #手動測試門檻
 threshold=0.340
 pred_fail = fail_prob >= threshold
-TP = ((pred_fail == True)  & (y_test == 1)).sum()
-FP = ((pred_fail == True)  & (y_test == -1)).sum()
-FN = ((pred_fail == False) & (y_test == 1)).sum()
-TN = ((pred_fail == False) & (y_test == -1)).sum()
+TP = ((pred_fail == True)  & (y_train== 1)).sum()
+FP = ((pred_fail == True)  & (y_train == -1)).sum()
+FN = ((pred_fail == False) & (y_train == 1)).sum()
+TN = ((pred_fail == False) & (y_train == -1)).sum()
 recall = TP / (TP + FN)
 precision = TP / (TP + FP) if (TP + FP) > 0 else 0
 accuracy = (TP + TN) / (TP + FP + FN + TN)
@@ -96,15 +90,15 @@ for threshold in np.arange(0.3, 0.5, 0.001):
 
     pred_fail = fail_prob >= threshold
 
-    TP = ((pred_fail == True)  & (y_test == 1)).sum()
-    FP = ((pred_fail == True)  & (y_test == -1)).sum()
-    FN = ((pred_fail == False) & (y_test == 1)).sum()
-    TN = ((pred_fail == False) & (y_test == -1)).sum()
+    TP = ((pred_fail == True)  & (y_train == 1)).sum()
+    FP = ((pred_fail == True)  & (y_train == -1)).sum()
+    FN = ((pred_fail == False) & (y_train == 1)).sum()
+    TN = ((pred_fail == False) & (y_train == -1)).sum()
 
     recall = TP / (TP + FN)
     precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    inspection_rate = (TP + FP) / len(y_test)
-
+    accuracy = (TP + TN) / (TP + FP + FN + TN)
+    inspection_rate = (TP + FP) / (TP + FP + FN + TN)
     result.append({
         "threshold": threshold,
         "TP": TP,
@@ -113,6 +107,7 @@ for threshold in np.arange(0.3, 0.5, 0.001):
         "TN": TN,
         "recall": recall,
         "precision": precision,
+        "accuracy":accuracy,
         "inspection_rate": inspection_rate
     })
 
@@ -123,16 +118,31 @@ target_result = logistic_result[
     logistic_result["recall"] >= 0.90
 ]
 
+#後來以threshold =0.0328為值，用測試資料做最後結果。
+threshold = target_result["threshold"].max()
+y_test_prob = model_balanced.predict_proba(x_test_scaled)
+fail_prob_test = y_test_prob[:, 1]
+pred_fail_test = fail_prob_test >= threshold
 
-#後來以threshold =0.032為值，結束logistic_
-threshold = 0.340
-pred_fail = fail_prob >= threshold
+TP = ((pred_fail_test == True)  & (y_test == 1)).sum()
+FP = ((pred_fail_test == True)  & (y_test == -1)).sum()
+FN = ((pred_fail_test == False) & (y_test == 1)).sum()
+TN = ((pred_fail_test == False) & (y_test == -1)).sum()
 
-TP = ((pred_fail == True)  & (y_test == 1)).sum()
-FP = ((pred_fail == True)  & (y_test == -1)).sum()
-FN = ((pred_fail == False) & (y_test == 1)).sum()
-TN = ((pred_fail == False) & (y_test == -1)).sum()
+recall = TP / (TP + FN)
+precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+accuracy = (TP + TN) / (TP + FP + FN + TN)
+inspection_rate = (TP + FP) / (TP + FP + FN + TN)
+print(f"threshold：{threshold}")
+print(f"TP：{TP}")
+print(f"FP：{FP}")
+print(f"FN：{FN}")
+print(f"TN：{TN}")
+print(f"Recall：{recall:.2%}")
+print(f"Precision：{precision:.2%}")
+print(f"accuracy：{accuracy:.2%}")
+print(f"inspection_rate：{inspection_rate:.2%}")
 
 
 
-save_result("logisti_balance_top5", TP, FP, FN, TN)
+save_result("logisti_balance_top3", TP, FP, FN, TN)

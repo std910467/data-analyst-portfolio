@@ -24,13 +24,6 @@ labels = pd.read_csv(
 
 labels.columns = ["label","timestamp"]
 
-# 移除特徵無變化的欄位(有116欄)
-constant_cols = [
-    col for col in df.columns
-    if df[col].nunique() <= 1]
-len(constant_cols)
-df = df.drop(columns=constant_cols)
-
 # 依照所有特徵都看。
 x = df
 y = labels["label"]
@@ -43,8 +36,6 @@ x_train, x_test, y_train, y_test = train_test_split(
 )
 
 # 補值 將nan 改成 訓練模型的中位數。
-imputer = SimpleImputer(strategy="median")
-#下面指令，因為會有錯誤(系統衝突之類的)，後面加上；，可以避免某些衝突錯誤。
 imputer = SimpleImputer(strategy="median")
 x_train = pd.DataFrame(
     imputer.fit_transform(x_train),

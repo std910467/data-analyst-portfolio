@@ -331,4 +331,4 @@ print(f"inspection_rate：{inspection_rate:.2%}")
 
 
 
-save_result("rule_based_train_test", TP, FP, FN, TN)
+save_result("rule_based_train_test_top3", TP, FP, FN, TN)

@@ -23,13 +23,6 @@ labels = pd.read_csv(
 
 labels.columns = ["label","timestamp"]
 
-# 移除特徵無變化的欄位(有116欄)
-constant_cols = [
-    col for col in df.columns
-    if df[col].nunique() <= 1]
-len(constant_cols)
-df = df.drop(columns=constant_cols)
-
 # 依照01-2_Rule-Based_Train_Test，先只看差異最多的3筆特徵59、103、510。
 top3 = [59, 103, 510]
 x = df[top3]
