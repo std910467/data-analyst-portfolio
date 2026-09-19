@@ -63,8 +63,8 @@ model_balanced.fit(x_train_scaled, y_train);
 print(model_balanced.coef_)
 print(model_balanced.intercept_)
 
-#測試
-y_prob = model_balanced.predict_proba(x_test_scaled)
+#用訓練參數調整門檻值，目標recall  90%以上
+y_prob = model_balanced.predict_proba(x_train_scaled)
 print(model_balanced.classes_)
 fail_prob = y_prob[:, 1]
 

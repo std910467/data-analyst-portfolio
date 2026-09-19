@@ -30,11 +30,7 @@ constant_cols = [
 len(constant_cols)
 df = df.drop(columns=constant_cols)
 
-# 第一階段分析，只保留缺失值小於10%(不含10%)欄位
-first_columns = df.columns[df.isnull().mean() < 0.1]
-df_first_round = df[first_columns]
-
-x = df_first_round
+x = df
 y = labels["label"]
 
 x_train, x_test, y_train, y_test = train_test_split(
@@ -43,6 +39,10 @@ x_train, x_test, y_train, y_test = train_test_split(
     stratify=y,
     random_state=42
 )
+# 只保留訓練資料缺失值小於10%(不含10%)欄位
+null01_columns = x_train.columns[x_train.isnull().mean() < 0.1]
+x_train = x_train[null01_columns]
+x_test = x_test[null01_columns]
 
 #把nan補上中位數，再把型態array轉成DF
 imputer = SimpleImputer(strategy="median")
@@ -51,6 +51,7 @@ x_train = pd.DataFrame(
     columns=x_train.columns,
     index=x_train.index
 )
+# 測試資料用train的中位數
 x_test = pd.DataFrame(
     imputer.transform(x_test),
     columns=x_test.columns,
@@ -120,6 +121,7 @@ top_features = effect_df[
     effect_df["abs_cohens_d"] >= 0.5
 ].copy()
 
+
 # 再抓到固定數量100%~80%不良品的情況下，看所有特徵inspection_rate(檢查率)。
 quantile_list = np.arange(0, 0.21, 0.01)
 result = []
@@ -172,7 +174,7 @@ plt.legend()
 plt.grid(alpha=0.3)
 plt.show()
 
-# 第一階段 我打算先找一個主特徵，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
+# 我打算先找一個主特徵，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
 # 從圖來看，特徵510作為第一主規則
 # 鎖定 510看 0~0.1之間的看一下檢查率變化
 quantile_list = np.arange(0, 0.101, 0.001)
@@ -208,7 +210,7 @@ feature_510_df = pd.DataFrame(
     ]
 )
 # 看一下哪個節點交換效益最好，
-max_rate=feature_510_df["inspection_rate"].max()
+max_rate = feature_510_df["inspection_rate"].max()
 feature_510_df["avg_inspection_drop"] = (
     (max_rate - feature_510_df["inspection_rate"])
     / feature_510_df["quantile"])
@@ -233,6 +235,7 @@ top_features["threshold"] = (
     top_features["pass_mean"]
     - top_features["pass_std"]/4.3
     )
+# 計算門檻成功次數
 rule_count = pd.Series(0, index=x_train.index)
 gatekeeper_rule = (
     x_train[510] >= f510_threshold)
@@ -278,7 +281,8 @@ print(f"Precision：{precision:.2%}")
 print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
-#最後 拿測試資料看看
+
+#最後 拿測試資料做最後輸出
 rule_count = pd.Series(0, index=x_test.index)
 gatekeeper_rule = (
     x_test[510] >= f510_threshold)
