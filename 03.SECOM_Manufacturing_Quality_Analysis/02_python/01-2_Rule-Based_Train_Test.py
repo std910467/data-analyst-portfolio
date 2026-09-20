@@ -328,7 +328,4 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-
-
-
 save_result("rule_based_train_test_top3", TP, FP, FN, TN)
