@@ -162,3 +162,13 @@ Test data 最終結果：
 相同 Test set 下，Balanced Logistic Regression（All Features）為 Recall 90.48%、Inspection Rate 71.66%。本次 Rule-Based 在相近 Inspection Rate 下多捕捉 1 筆 Fail，但 Test set 僅有 21 筆 Fail，因此目前僅視為單次 holdout test 結果，不直接推論 Rule-Based 一定優於 Logistic Regression。
 
 後續再考慮使用不同資料切分或 Cross Validation，觀察結果是否穩定。
+
+### 9/21筆記 Decision Tree 與 Random Forest 測試
+
+Decision Tree
+完成 All Features 與 Top3 Features（59、103、510）比較。All Features 在 Test 的 Recall 為 42.86%、Inspection Rate 為 40.76%，且呈現明顯 Train/Test performance gap；縮減至 Top3 後，Test Recall 提升至 61.90%、Inspection Rate 降至 29.94%，Train/Test 差距也縮小。在本次資料切分下，Top3 模型呈現較穩定的泛化表現，但 Recall 仍未達專案設定的高召回目標。
+
+Random Forest
+開始 Random Forest 測試，導入 OOB（Out-of-Bag）作為內部驗證方式，避免直接使用 Test 資料進行模型與 threshold 調整。
+原始 RF 在 Train prediction 上呈現近乎完美的分類結果，但 OOB 表現明顯下降。OOB probability 中 Fail 整體高於 Pass，表示模型具有部分區分能力，但兩者仍有明顯重疊。進一步進行 threshold 掃描後，在 Recall 約 90% 的條件下仍需要較高的 Inspection Rate。
+另外測試 max_depth=5，結果在高 Recall 條件下 Inspection Rate 反而提高，暫未優於原始設定。後續將繼續透過 OOB 調整 Random Forest 參數，目標是在維持高 Recall 的同時降低 Inspection Rate。
