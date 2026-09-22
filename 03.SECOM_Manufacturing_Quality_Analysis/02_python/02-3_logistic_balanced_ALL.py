@@ -150,4 +150,4 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("logisti_balance_ALL", TP, FP, FN, TN)
+save_result("logistic_balance_ALL", TP, FP, FN, TN)

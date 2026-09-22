@@ -172,3 +172,14 @@ Random Forest
 開始 Random Forest 測試，導入 OOB（Out-of-Bag）作為內部驗證方式，避免直接使用 Test 資料進行模型與 threshold 調整。
 原始 RF 在 Train prediction 上呈現近乎完美的分類結果，但 OOB 表現明顯下降。OOB probability 中 Fail 整體高於 Pass，表示模型具有部分區分能力，但兩者仍有明顯重疊。進一步進行 threshold 掃描後，在 Recall 約 90% 的條件下仍需要較高的 Inspection Rate。
 另外測試 max_depth=5，結果在高 Recall 條件下 Inspection Rate 反而提高，暫未優於原始設定。後續將繼續透過 OOB 調整 Random Forest 參數，目標是在維持高 Recall 的同時降低 Inspection Rate。
+
+### 9/22 筆記
+9/22 Random Forest 與 OOB 調參
+
+完成 Random Forest 模型測試，使用 OOB（Out-of-Bag）作為內部驗證資料，在不使用 Test set 調參的情況下，以 Recall ≥ 90% 為條件，尋找較低的 Inspection Rate。
+
+依序測試 max_depth、min_samples_leaf、max_features 與 n_estimators。結果顯示 max_depth=5 在高 Recall 條件下需要過高的 Inspection Rate；調整 min_samples_leaf 後，以 10 的結果較佳；max_features 則保留預設的 sqrt。最後將樹數增加至 500，以提高 OOB 結果的穩定性。
+
+最終參數採用 n_estimators=500、min_samples_leaf=10、max_features="sqrt"，並依 OOB 結果固定 threshold=0.045，再進行 Test 評估。Test 結果為 Recall 90.48%、Precision 8.52%、Inspection Rate 71.02%。
+
+另外測試移除 116 個無變化特徵，但 OOB 在高 Recall 條件下的 Inspection Rate 未改善，因此保留原始特徵版本。整體而言，Random Forest 達成約 90% Recall，但目前並未明顯優於 Rule-Based 方法。

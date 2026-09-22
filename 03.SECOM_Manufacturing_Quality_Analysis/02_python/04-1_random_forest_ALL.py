@@ -49,11 +49,18 @@ x_test = pd.DataFrame(
     index=x_test.index
 )
 
-# 使用random_tree，先簡單創建100棵樹(n_estimators=100)
+# Random Forest 參數選定：
+# 使用 OOB 作為內部驗證，以 Recall >= 90% 為條件，比較不同參數下的 Inspection Rate。
+# 測試 max_depth、min_samples_leaf、max_features 後，
+# 最終採用 min_samples_leaf=10、max_features="sqrt"；
+# n_estimators 提高至 500 以增加模型穩定性。
+# OOB threshold 掃描後選定 0.045（Recall=92.8%、Inspection Rate=71.1%），
+# 固定模型參數與 threshold 後，再進行最終 Test 評估。
 model_rf = RandomForestClassifier(
-    n_estimators=100,
+    n_estimators=500,
     # class_weight="balanced",
-    max_depth=5,
+    min_samples_leaf=10,
+    # max_features=10,
     oob_score=True,
     random_state=42
 )
@@ -69,8 +76,8 @@ FN = (~pred_fail &  actual_fail).sum()
 TN = (~pred_fail & ~actual_fail).sum()
 
 recall = TP / (TP + FN)
-precision = TP / (TP + FP)
-inspection_rate = (TP + FP) / len(y_train)
+precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+inspection_rate = (TP + FP) / (TP + FP + FN + TN)
 
 print("TP:", TP, "FP:", FP, "FN:", FN, "TN:", TN)
 print("Recall:", recall)
@@ -95,58 +102,17 @@ for threshold in np.arange(0.01, 0.051, 0.005):
     TN = (~pred_fail & ~actual_fail).sum()
 
     recall = TP / (TP + FN)
-    inspection_rate = (TP + FP) / len(y_train)
+    inspection_rate = (TP + FP) / (TP + FP + FN + TN)
 
     print(
-        round(threshold, 2),
+        round(threshold, 3),
         round(recall, 3),
         round(inspection_rate, 3)
     )
 
-
-
-
-
-y_prob = model_rf.predict_proba(x_train)
-# 看一下模型訓練的對應y區分
-# print(model_tree_final.classes_)
-fail_prob = y_prob[:, 1]
-
-threshold=0.5
-actual_fail = y_train == 1
-pred_fail = fail_prob >= threshold
-TP = ( pred_fail  & actual_fail).sum()
-FP = ( pred_fail  & ~actual_fail).sum()
-FN = ( ~pred_fail & actual_fail).sum()
-TN = ( ~pred_fail & ~actual_fail).sum()
-recall = TP / (TP + FN)
-precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-accuracy = (TP + TN) / (TP + FP + FN + TN)
-inspection_rate = (TP + FP) / (TP + FP + FN + TN)
-print(f"threshold：{threshold}")
-print(f"TP：{TP}")
-print(f"FP：{FP}")
-print(f"FN：{FN}")
-print(f"TN：{TN}")
-print(f"Recall：{recall:.2%}")
-print(f"Precision：{precision:.2%}")
-print(f"accuracy：{accuracy:.2%}")
-print(f"inspection_rate：{inspection_rate:.2%}")
-
-train_result = pd.DataFrame({
-    "actual": y_train,
-    "fail_prob": fail_prob
-})
-
-print(
-    train_result.groupby("actual")["fail_prob"]
-    .agg(["mean", "median", "min", "max"])
-)
-
-
 y_prob = model_rf.predict_proba(x_test)
 fail_prob = y_prob[:, 1]
-threshold=0.5
+threshold=0.045
 actual_fail = y_test == 1
 pred_fail = fail_prob >= threshold
 TP = ( pred_fail  & actual_fail).sum()
@@ -166,9 +132,7 @@ print(f"Recall：{recall:.2%}")
 print(f"Precision：{precision:.2%}")
 print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
-print("max:", fail_prob.max())
-print("min:", fail_prob.min())
-print("mean:", fail_prob.mean())
+
 
 save_result("random_forest_ALL", TP, FP, FN, TN)
 # %%
