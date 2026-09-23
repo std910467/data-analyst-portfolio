@@ -183,3 +183,13 @@ Random Forest
 最終參數採用 n_estimators=500、min_samples_leaf=10、max_features="sqrt"，並依 OOB 結果固定 threshold=0.045，再進行 Test 評估。Test 結果為 Recall 90.48%、Precision 8.52%、Inspection Rate 71.02%。
 
 另外測試移除 116 個無變化特徵，但 OOB 在高 Recall 條件下的 Inspection Rate 未改善，因此保留原始特徵版本。整體而言，Random Forest 達成約 90% Recall，但目前並未明顯優於 Rule-Based 方法。
+
+### 9/23 Gradient Boosting
+
+完成 Gradient Boosting 模型實作，理解 Boosting 與 Random Forest 的差異：Random Forest 透過多棵獨立樹進行整合，而 Gradient Boosting 則依序建立模型，後續 Tree 持續針對目前模型的誤差進行修正。
+
+本次將原 Train 再切分為 Training / Validation，保留 Test 作為最終評估資料。使用 Validation 進行參數與 threshold 選擇，並以 Recall ≥ 90% 為條件，比較不同設定下的 Inspection Rate。
+
+依序測試 max_depth、learning_rate 與 n_estimators，最終採用 max_depth=2、learning_rate=0.05、n_estimators=100。Validation threshold 選定為 0.035，此時 Recall 為 94.1%、Inspection Rate 為 70.1%。
+
+固定模型參數與 threshold 後進行最終 Test，結果為 Recall 85.71%、Precision 8.00%、Inspection Rate 71.66%。Validation 與 Test 的 Inspection Rate 接近，但 Test Recall 下降，顯示 Validation 上的最佳結果不一定能完全延續到未知資料。
