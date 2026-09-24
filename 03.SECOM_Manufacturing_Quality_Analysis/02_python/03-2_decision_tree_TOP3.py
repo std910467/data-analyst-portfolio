@@ -1,12 +1,9 @@
 # %%
 import pandas as pd
 from pathlib import Path
-import numpy as np
-import matplotlib.pyplot as plt
 from model_results import save_result
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
 # 檔案路徑
@@ -50,7 +47,9 @@ x_test = pd.DataFrame(
     index=x_test.index
 )
 
-# 直接參考3-1_decision_tree，使用balanced，depth=3、leaf=40。
+# 使用與3-1_decision_tree_ALL相同的模型設定，
+# balanced，depth=3、leaf=40。
+# 比較僅使用 Top3 Features（59、103、510）時的模型表現。
 model_tree_final = DecisionTreeClassifier(
     min_samples_leaf=40,
     max_depth=3,
@@ -114,5 +113,5 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("decision_tree_TOP3", TP, FP, FN, TN)
+save_result("decision_tree_top3", TP, FP, FN, TN)
 # %%

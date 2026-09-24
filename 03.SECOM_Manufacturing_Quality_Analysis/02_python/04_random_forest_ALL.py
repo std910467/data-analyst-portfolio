@@ -2,11 +2,10 @@
 import pandas as pd
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
 from model_results import save_result
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 # 檔案路徑
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,14 +32,6 @@ x_train, x_test, y_train, y_test = train_test_split(
     stratify=y,
     random_state=42
 )
-# 把訓練資料在拉出20% 作為驗證調整參數使用
-x_train, x_val, y_train, y_val = train_test_split(
-    x_train, y_train,
-    test_size=0.2,
-    stratify=y_train,
-    random_state=42
-)
-
 
 # 補值 將nan 改成 訓練模型的中位數。
 imputer = SimpleImputer(strategy="median")
@@ -49,11 +40,6 @@ x_train = pd.DataFrame(
     columns=x_train.columns,
     index=x_train.index
 )
-x_val = pd.DataFrame(
-    imputer.transform(x_val),
-    columns=x_val.columns,
-    index=x_val.index
-)
 
 x_test = pd.DataFrame(
     imputer.transform(x_test),
@@ -61,28 +47,25 @@ x_test = pd.DataFrame(
     index=x_test.index
 )
 
-# Gradient Boosting 參數選定：
-# 將原 Train 再切分 Training / Validation，使用 Validation 進行參數與 threshold 選擇，
-# 並以 Recall >= 90% 為條件，比較不同設定下的 Inspection Rate。
-# 測試 max_depth=1、2、3 後，max_depth=2 的高 Recall / Inspection Rate 表現較佳；
-# 再比較 learning_rate=0.05、0.1、0.2，以 0.05 表現較佳；
-# 最後比較 n_estimators=50、100、200，以 100 棵的結果較佳。
-# 最終採用 max_depth=2、learning_rate=0.05、n_estimators=100。
-# Validation threshold 掃描後選定 0.035（Recall=94.1%、Inspection Rate=70.1%），
+# Random Forest 參數選定：
+# 使用 OOB 作為內部驗證，以 Recall >= 90% 為條件，比較不同參數下的 Inspection Rate。
+# 測試 max_depth、min_samples_leaf、max_features 後，
+# 最終採用 min_samples_leaf=10、max_features="sqrt"；
+# n_estimators 提高至 500 以增加模型穩定性。
+# OOB threshold 掃描後選定 0.045（Recall=92.8%、Inspection Rate=71.1%），
 # 固定模型參數與 threshold 後，再進行最終 Test 評估。
-model_gb = GradientBoostingClassifier(
-    n_estimators=100,
-    learning_rate=0.05,
-    max_depth=2,
+model_rf = RandomForestClassifier(
+    n_estimators=500,
+    min_samples_leaf=10,
+    max_features="sqrt",
+    oob_score=True,
     random_state=42
 )
 
-model_gb.fit(x_train, y_train);
-
-val_prob = model_gb.predict_proba(x_val)
-fail_prob = val_prob[:, 1]
-actual_fail = y_val == 1
-pred_fail = fail_prob >= 0.5
+model_rf.fit(x_train, y_train);
+oob_prob = model_rf.oob_decision_function_[:, 1]
+actual_fail = y_train == 1
+pred_fail = oob_prob >= 0.5
 
 TP = ( pred_fail &  actual_fail).sum()
 FP = ( pred_fail & ~actual_fail).sum()
@@ -98,42 +81,35 @@ print("Recall:", recall)
 print("Precision:", precision)
 print("Inspection Rate:", inspection_rate)
 
-val_prob = model_gb.predict_proba(x_val)[:, 1]
-print(model_gb.classes_)
-print("Pass probability")
-print(pd.Series(val_prob[y_val == -1]).describe())
+oob_result = pd.DataFrame({
+    "actual": y_train.values,
+    "prob": oob_prob
+})
 
-print("\nFail probability")
-print(pd.Series(val_prob[y_val == 1]).describe())
+print(
+    oob_result.groupby("actual")["prob"]
+    .agg(["mean", "median", "min", "max"])
+)
+for threshold in np.arange(0.01, 0.051, 0.005):
+    pred_fail = oob_prob >= threshold
 
-
-
-threshold_list = np.arange(0.01, 0.101, 0.005)
-
-for threshold in threshold_list:
-    pred_fail = val_prob >= threshold
-    actual_fail = y_val == 1
-
-    TP = (pred_fail & actual_fail).sum()
-    FP = (pred_fail & ~actual_fail).sum()
-    FN = (~pred_fail & actual_fail).sum()
+    TP = ( pred_fail &  actual_fail).sum()
+    FP = ( pred_fail & ~actual_fail).sum()
+    FN = (~pred_fail &  actual_fail).sum()
     TN = (~pred_fail & ~actual_fail).sum()
 
     recall = TP / (TP + FN)
-    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    inspection_rate = (TP + FP) / len(y_val)
+    inspection_rate = (TP + FP) / (TP + FP + FN + TN)
 
     print(
         round(threshold, 3),
-        "Recall:", round(recall, 3),
-        "Precision:", round(precision, 3),
-        "Inspection:", round(inspection_rate, 3)
+        round(recall, 3),
+        round(inspection_rate, 3)
     )
 
-
-y_prob = model_gb.predict_proba(x_test)
+y_prob = model_rf.predict_proba(x_test)
 fail_prob = y_prob[:, 1]
-threshold=0.035
+threshold=0.045
 actual_fail = y_test == 1
 pred_fail = fail_prob >= threshold
 TP = ( pred_fail  & actual_fail).sum()
@@ -155,5 +131,5 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("gradient_boosting_ALL", TP, FP, FN, TN)
+save_result("random_forest_all", TP, FP, FN, TN)
 # %%

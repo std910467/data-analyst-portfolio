@@ -4,6 +4,9 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from model_results import save_result
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+
 
 # 檔案路徑
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,21 +30,38 @@ constant_cols = [
 len(constant_cols)
 df = df.drop(columns=constant_cols)
 
-# 第一階段分析，只保留缺失值小於10%(不含10%)欄位，並且把有缺失值的資料行移除
-first_columns = df.columns[df.isnull().mean() < 0.1]
-df_first_round = df[first_columns]
-df_first_round = pd.concat([df_first_round, labels],axis=1)
-df_first_round = df_first_round.dropna()
-# print(f"原資料集形狀(不考慮labels): {df.shape}")
-# print(f"第一輪使用的資料集形狀(不考慮labels): {df_first_round.shape[0], df_first_round.shape[1] - 2}")
-# print(f"第一輪使用的保留資料比例(不考慮labels): {round(df_first_round.shape[0]*(df_first_round.shape[1] - 2)/(df.shape[0]*df.shape[1]),2)}")
-# 原資料集形狀(不考慮labels): (1567, 474)
-# 第一輪使用的資料集形狀(不考慮labels): (1393, 422)
-# 第一輪使用的保留資料比例(不考慮labels): 0.79
+x = df
+y = labels["label"]
 
-feature_cols= df_first_round.columns[:-2]
-pass_df = df_first_round[df_first_round["label"]== -1]
-fail_df = df_first_round[df_first_round["label"]==  1]
+x_train, x_test, y_train, y_test = train_test_split(
+    x, y,
+    test_size=0.2,
+    stratify=y,
+    random_state=42
+)
+# 只保留訓練資料缺失值小於10%(不含10%)欄位
+null01_columns = x_train.columns[x_train.isnull().mean() < 0.1]
+x_train = x_train[null01_columns]
+x_test = x_test[null01_columns]
+
+#把nan補上中位數，再把型態array轉成DF
+imputer = SimpleImputer(strategy="median")
+x_train = pd.DataFrame(
+    imputer.fit_transform(x_train),
+    columns=x_train.columns,
+    index=x_train.index
+)
+# 測試資料用train的中位數
+x_test = pd.DataFrame(
+    imputer.transform(x_test),
+    columns=x_test.columns,
+    index=x_test.index
+)
+
+pass_df = x_train[y_train == -1]
+fail_df = x_train[y_train ==  1]
+feature_cols= x_train.columns
+
 
 ## 計算看看不良品跟良品 特徵平均值+標準差重疊的多寡，並將重疊比例越少的排越前面。
 result = []
@@ -96,26 +116,27 @@ for i in range(9, 0, -1):
     count = (effect_df["abs_cohens_d"] >= threshold).sum()
     print(f"Cohen's d >= {threshold:.1f}：{count} 筆")
 
-#針對abs_cohen's d大於0.5特徵當作設立門檻值，有5筆。
+#針對abs_cohen's d大於0.5特徵當作設立門檻值，有3筆。
 top_features = effect_df[
     effect_df["abs_cohens_d"] >= 0.5
 ].copy()
 
-# 再抓到固定數量100%~70%不良品的情況下，看所有特徵inspection_rate(檢查率)。
-quantile_list = np.arange(0, 0.31, 0.01)
+
+# 再抓到固定數量100%~80%不良品的情況下，看所有特徵inspection_rate(檢查率)。
+quantile_list = np.arange(0, 0.21, 0.01)
 result = []
 for feature in top_features["feature"]:
     feature = int(feature)
     for q in quantile_list:
         threshold = fail_df[feature].quantile(q)
-        pred_fail = df_first_round[feature] >= threshold
-        actual_fail = df_first_round["label"] == 1
+        pred_fail = x_train[feature] >= threshold
+        actual_fail = y_train == 1
         TP = (pred_fail & actual_fail).sum()
         FP = (pred_fail & ~actual_fail).sum()
         FN = (~pred_fail & actual_fail).sum()
         TN = (~pred_fail & ~actual_fail).sum()
         recall = TP / (TP + FN)
-        inspection_rate = (TP + FP) / len(df_first_round)
+        inspection_rate = (TP + FP) / (TP+FP+FN+TN)
         result.append([
             feature,
             q,
@@ -153,22 +174,22 @@ plt.legend()
 plt.grid(alpha=0.3)
 plt.show()
 
-# 第一階段 我打算先找一個主特徵，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
+# 我打算先找一個主特徵，以抓到9成以上不良品為目標，但inspection_rate(檢查率)最低的
 # 從圖來看，特徵510作為第一主規則
-#鎖定 510看 0~0.1之間的看一下檢查率變化
+# 鎖定 510看 0~0.1之間的看一下檢查率變化
 quantile_list = np.arange(0, 0.101, 0.001)
 result = []
 feature = 510
 for q in quantile_list:
     threshold = fail_df[feature].quantile(q)
-    pred_fail = df_first_round[feature] >= threshold
-    actual_fail = df_first_round["label"] == 1
+    pred_fail = x_train[feature] >= threshold
+    actual_fail = y_train == 1
     TP = (pred_fail & actual_fail).sum()
     FP = (pred_fail & ~actual_fail).sum()
     FN = (~pred_fail & actual_fail).sum()
     TN = (~pred_fail & ~actual_fail).sum()
     recall = TP / (TP + FN)
-    inspection_rate = (TP + FP) / len(df_first_round)
+    inspection_rate = (TP + FP) / (TP + FP + FN + TN)
     result.append([
         q,
         threshold,
@@ -189,87 +210,35 @@ feature_510_df = pd.DataFrame(
     ]
 )
 # 看一下哪個節點交換效益最好，
-max_rate=feature_510_df["inspection_rate"].max()
+max_rate = feature_510_df["inspection_rate"].max()
 feature_510_df["avg_inspection_drop"] = (
     (max_rate - feature_510_df["inspection_rate"])
     / feature_510_df["quantile"])
 
 
-# 把斜率最大的，也就是平均放棄一個fail減少最多檢查率的，當作門檻也就是0.09。
+
+# 把斜率最大的，也就是平均放棄一個fail減少最多檢查率的，當作門檻也就是26.409366。
 f510_threshold = feature_510_df.loc[feature_510_df["avg_inspection_drop"].idxmax(), "threshold"]
 threshold_table = pd.DataFrame({
     "feature": [510],
     "role": ["gatekeeper"],
     "threshold": f510_threshold
 })
+# 看一下選了那個f510_threshold
+# feature_510_df[feature_510_df["threshold"] == f510_threshold]
 
 
-#計算其他特徵的門檻值，已pass_mean+pass+std/2為準。
+# 510特徵不動，調整另外2個門檻規則，用訓練資料調整為我想要的9成recall
+# 用標準差的倍數來當微調機制+std太高、-std/2太低、-std/3太低。
+# 最後用-std/4.3，使 Train Recall 達到約 90% 以上
 top_features["threshold"] = (
     top_features["pass_mean"]
-    # + top_features["pass_std"]/2
+    - top_features["pass_std"]/4.3
     )
-
-
-# region 測試一下TOP特徵的通用門檻值自已的狀況
-rule_result = []
-
-for _, row in top_features.iterrows():
-    feature = int(row["feature"])
-    threshold = row["threshold"]
-
-    # 單一 Feature 規則
-    pred_fail = df_first_round[feature] >= threshold
-    actual_fail = df_first_round["label"] == 1
-
-    # TP / FP / FN / TN
-    TP = (pred_fail & actual_fail).sum()
-    FP = (pred_fail & ~actual_fail).sum()
-    FN = (~pred_fail & actual_fail).sum()
-    TN = (~pred_fail & ~actual_fail).sum()
-
-    # 指標
-    recall = TP / (TP + FN)
-    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    accuracy = (TP + TN) / (TP + FP + FN + TN)
-    inspection_rate = (TP + FP) / len(df_first_round)
-    rule_result.append([
-        feature,
-        threshold,
-        TP,
-        FP,
-        FN,
-        TN,
-        recall,
-        precision,
-        accuracy,
-        inspection_rate
-    ])
-
-rule_df = pd.DataFrame(
-    rule_result,
-    columns=[
-        "feature",
-        "threshold",
-        "TP",
-        "FP",
-        "FN",
-        "TN",
-        "recall",
-        "precision",
-        "accuracy",
-        "inspection_rate"
-    ]
-)
-# print(rule_df)
-# endregion
-
-
-
-#用五個門檻規則測試~原始資料看準確度
-rule_count = pd.Series(0, index=df.index)
+# 計算另外兩個特徵門檻篩選成功次數
+rule_count = pd.Series(0, index=x_train.index)
 gatekeeper_rule = (
-    df[510] >= f510_threshold)
+    x_train[510] >= f510_threshold)
 
 for _, row in top_features[
     top_features["feature"] != 510
@@ -278,14 +247,14 @@ for _, row in top_features[
     threshold = row["threshold"]
 
     rule_count += (
-        df[feature] > threshold
+        x_train[feature] > threshold
     ).astype(int)
 
-# 510 成立，而且其他 4 個至少 1個成立
+# 510 成立，而且其他2個至少1個成立
 pred_fail = gatekeeper_rule & (rule_count >= 1)
 
 # 真實結果
-actual_fail = labels["label"] == 1
+actual_fail = y_train == 1
 
 
 # TP / FP / FN / TN
@@ -313,4 +282,50 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("Rule-Based", TP, FP, FN, TN)
+#最後 拿測試資料做最後輸出
+rule_count = pd.Series(0, index=x_test.index)
+gatekeeper_rule = (
+    x_test[510] >= f510_threshold)
+
+for _, row in top_features[
+    top_features["feature"] != 510
+    ].iterrows():
+    feature = int(row["feature"])
+    threshold = row["threshold"]
+
+    rule_count += (
+        x_test[feature] > threshold
+    ).astype(int)
+
+# 510 成立，而且其他2個至少1個成立
+pred_fail = gatekeeper_rule & (rule_count >= 1)
+# 真實結果
+actual_fail = y_test == 1
+
+
+# TP / FP / FN / TN
+TP = (pred_fail & actual_fail).sum()
+FP = (pred_fail & ~actual_fail).sum()
+FN = (~pred_fail & actual_fail).sum()
+TN = (~pred_fail & ~actual_fail).sum()
+
+# 指標
+recall = TP / (TP + FN)
+precision = TP / (TP + FP)
+accuracy = (TP + TN) / (TP + FP + FN + TN)
+inspection_rate = (TP + FP) / (TP + FP + FN + TN)
+
+
+print(f"TP：{TP}")
+print(f"FP：{FP}")
+print(f"FN：{FN}")
+print(f"TN：{TN}")
+
+print(f"Recall：{recall:.2%}")
+print(f"Precision：{precision:.2%}")
+print(f"accuracy：{accuracy:.2%}")
+print(f"inspection_rate：{inspection_rate:.2%}")
+
+
+save_result("rule_based_top3", TP, FP, FN, TN)
+# %%

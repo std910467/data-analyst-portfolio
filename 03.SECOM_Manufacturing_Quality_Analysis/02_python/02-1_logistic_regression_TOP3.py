@@ -89,13 +89,14 @@ for threshold in np.arange(0.01, 0.101, 0.001):
 
 logistic_result = pd.DataFrame(result)
 
-# recall 90%以下，誰inspection_rate最低
+# 在 Recall >= 90% 的條件下，選擇 Inspection Rate 最低的 threshold 
 target_result = logistic_result[
     logistic_result["recall"] >= 0.90
 ]
+best_result = target_result.loc[
+    target_result["inspection_rate"].idxmin()]
+threshold = best_result["threshold"]
 
-#後來以threshold =0.032為值，結束logistic_
-threshold = target_result["threshold"].max()
 y_test_prob = model.predict_proba(x_test_scaled)
 fail_prob_test = y_test_prob[:, 1]
 pred_fail_test = fail_prob_test >= threshold
@@ -120,4 +121,5 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("logistic_top3", TP, FP, FN, TN)
+save_result("logistic_regression_top3", TP, FP, FN, TN)
+# %%

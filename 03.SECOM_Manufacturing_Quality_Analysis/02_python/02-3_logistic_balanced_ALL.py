@@ -30,7 +30,7 @@ constant_cols = [
 len(constant_cols)
 df = df.drop(columns=constant_cols)
 
-# 依照所有特徵都看。
+# 使用移除 constant features 後的所有特徵
 x = df
 y = labels["label"]
 
@@ -119,13 +119,14 @@ for threshold in np.arange(0.8, 0.9, 0.001):
 
 logistic_result = pd.DataFrame(result)
 
-# recall 90%以下，誰inspection_rate最低
+# 在 Recall >= 90% 的條件下，選擇 Inspection Rate 最低的 threshold
 target_result = logistic_result[
-    logistic_result["recall"] >= 0.90
-]
+    logistic_result["recall"] >= 0.90]
+best_result = target_result.loc[
+    target_result["inspection_rate"].idxmin()]
+threshold = best_result["threshold"]
 
-#後來以threshold =0.879為值，用測試資料做最後結果。
-threshold = target_result["threshold"].max()
+
 y_test_prob = model_balanced.predict_proba(x_test_scaled)
 fail_prob_test = y_test_prob[:, 1]
 pred_fail_test = fail_prob_test >= threshold
@@ -150,4 +151,5 @@ print(f"accuracy：{accuracy:.2%}")
 print(f"inspection_rate：{inspection_rate:.2%}")
 
 
-save_result("logistic_balance_ALL", TP, FP, FN, TN)
+save_result("logistic_balance_all", TP, FP, FN, TN)
+# %%

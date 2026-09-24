@@ -2,12 +2,17 @@
 
 ## 專案說明
 
-本專案使用 UCI SECOM 半導體製程公開資料，練習製造業品質資料分析。
+本專案使用 UCI SECOM 半導體製程公開資料，進行製造業品質資料分析。
 
-SECOM 資料包含大量製程特徵，以及每筆資料對應的 Pass / Fail 結果。  
-這次希望從前兩個專案的資料整理與描述性分析，再往統計分析、特徵篩選與 Machine Learning 延伸。
+SECOM 資料包含大量匿名化製程特徵，以及每筆資料對應的 Pass / Fail 結果。原始資料共有 1,567 筆、590 個 Features，其中 Pass 1,463 筆、Fail 104 筆，Fail 約占 6.64%，資料有明顯的類別不平衡。
 
-目前專案進行中。
+這次從前兩個專案的資料整理與描述性分析再往下延伸，加入統計分析、特徵篩選、Rule-Based 與 Machine Learning 模型。
+
+分析目的不是直接取代品質檢查，而是先利用製程資料做風險篩選：
+
+> **盡量找出 Fail，同時減少需要進一步檢查的產品數量。**
+
+因此本專案將 **Recall ≥ 90%** 設為主要目標，再比較不同方法能將 **Inspection Rate** 降到多少。
 
 ---
 
@@ -15,181 +20,197 @@ SECOM 資料包含大量製程特徵，以及每筆資料對應的 Pass / Fail �
 
 UCI Machine Learning Repository - SECOM
 
-原始資料：
+原始檔案：
 
-- `secom.data`：製程特徵資料
-- `secom_labels.data`：Pass / Fail 與時間資料
-- `secom.names`：資料集說明
+* `secom.data`：製程特徵資料
+* `secom_labels.data`：Pass / Fail 與時間資料
+* `secom.names`：資料集說明
+
+資料內容：
+
+* 資料筆數：1,567
+* 製程 Features：590
+* Pass：1,463
+* Fail：104
+* Fail Rate：約 6.64%
+
+由於 Features 都是匿名欄位，因此本專案只分析各 Feature 與 Pass / Fail 之間的差異及分類效果，不推測 Feature 實際代表的製程參數，也不做因果解讀。
 
 ---
 
-## 預計分析方向
+## 專案目標
 
-- 檢查資料結構、缺失值與資料品質
-- 觀察 Pass / Fail 分布與類別不平衡
-- 比較 Pass / Fail 的製程特徵差異
-- 進行特徵篩選，找出較有影響的製程特徵
-- 嘗試建立基礎 Machine Learning 分類模型
-- 使用 Precision、Recall、F1-Score 等指標評估模型
+這次把問題設定成「風險篩選」。
+
+假設原本所有產品都需要進一步檢查，希望先利用製程資料篩出高風險產品，在盡量不要漏掉 Fail 的情況下，減少需要檢查的產品比例。
+
+主要目標：
+
+> **Recall ≥ 90%，再盡可能降低 Inspection Rate。**
+
+### Recall
+
+Recall 代表實際的 Fail 中，有多少被成功找出來。
+
+`Recall = TP / (TP + FN)`
+
+例如 Test set 中有 21 個 Fail，成功找出其中 20 個：
+
+`Recall = 20 / 21 = 95.24%`
+
+所以 Recall 越高，代表漏掉的 Fail 越少。
+
+### Inspection Rate
+
+Inspection Rate 代表全部產品中，有多少被判定需要進一步檢查。
+
+`Inspection Rate = (TP + FP) / Total Samples`
+
+例如 100 個產品中有 70 個被標記需要檢查，Inspection Rate 就是 70%。
+
+因此這次希望：
+
+* Recall 維持在 90% 以上，盡量不要漏掉 Fail
+* 在這個條件下，Inspection Rate 越低越好
+
+兩個指標需要一起看。如果只追求高 Recall，很容易把大部分產品都送去檢查；如果只追求低 Inspection Rate，又可能漏掉太多 Fail。
+
+另外，由於 Fail 只占全部資料約 6.64%，Accuracy 很容易受到大量 Pass 影響，因此不把 Accuracy 當成主要的模型選擇標準。
+
+---
+
+## 分析流程
+
+### 1. 資料品質檢查
+先檢查：
+* 資料筆數與 Feature 數量
+* Pass / Fail 分布
+* 缺失值
+* 沒有變化的 Features
+
+原始 590 個 Features 中，有 116 個 Feature 的有效數值只有一種，沒有可用的變化資訊，因此在需要進行特徵篩選的分析中先移除。
+
+缺失值則依後續分析方式處理，Machine Learning 模型以 Train data 的 median 進行填補，避免使用 Test data 的資訊。
+
+### 2. 單變量統計分析
+
+先分別觀察每一個 Feature，比較 Pass / Fail 的差異。
+
+因為各 Feature 的數值尺度不同，因此使用 Cohen's d 將差異標準化，主要計算：
+
+* Pass / Fail Mean
+* Pass / Fail Standard Deviation
+* Pooled Standard Deviation
+* Cohen's d
+
+Cohen's d 主要用來找出 Pass / Fail 差異較明顯的候選 Features。
+
+正式 Train data 中以 `|Cohen's d| >= 0.5` 篩選後，得到：
+
+* Feature 59
+* Feature 103
+* Feature 510
+
+這些 Features 只代表在目前資料中 Pass / Fail 的分布差異較明顯，不代表它們是造成 Fail 的原因。
+
+### 3. Rule-Based Screening
+
+先使用統計分析找出的候選 Features 建立人工篩選規則。
+
+Rule-Based 的做法分成兩個階段：
+
+1. 先使用 Feature 510 作為 Gatekeeper，盡量攔下 Fail
+2. 再利用其他候選 Features 排除部分誤抓的 Pass
+
+目標一樣是在 Recall 維持 90% 以上的情況下，盡量降低 Inspection Rate。
+
+正式版本使用 80 / 20 Train / Test split，缺失值處理、Cohen's d 特徵篩選及規則門檻都使用 Train data 建立，最後再套用到 Test set。
+
+### 4. Machine Learning
+
+接著建立不同 Machine Learning 分類模型，與 Rule-Based 方法比較：
+
+* Logistic Regression
+* Logistic Regression + Class Weight
+* Decision Tree
+* Random Forest
+* Gradient Boosting
+
+模型主要比較 Recall 與 Inspection Rate。
+
+在模型與 threshold 調整上，依不同模型使用 Train、Validation 或 OOB（Out-of-Bag）資料進行調整，Test set 則留到最後評估。
 
 ---
 
 ## 使用技術
 
-- Python
-- Pandas
-- Matplotlib
-- Scikit-learn（後續）
+* Python
+* Pandas
+* NumPy
+* Matplotlib
+* Scikit-learn
+* Cohen's d
+* Logistic Regression
+* Decision Tree
+* Random Forest
+* Gradient Boosting
+* Train / Test Split
+* Train / Validation / Test Split
+* OOB（Out-of-Bag）
+* Probability Threshold Adjustment
 
 ---
 
-## 目前進度
+## 模型比較
 
-### 第一階段
-第一階段先以單一 Feature 為單位，比較 Pass / Fail 的差異，暫不考慮 Feature 間的交互作用。
-先檢查原始 Feature，若欄位中的有效數值種類只有 1 種（包含其餘為 NaN 的情況），代表該 Feature 沒有可用的變化資訊，因此直接移除。(116欄無效)
-單變量
-先處理缺失值，保留缺失率低於 10% 的 Feature，再將剩餘缺失資料以 `dropna()` 移除。
+最終 Test set 共 314 筆：
 
-- 原始資料：1,567 筆、590 Features
-- 第一輪資料：1,393 筆、538 Features
-- Pass：1,463 → 1,294
-- Fail：104 → 99
-- Fail 樣本仍保留約 95%
+* Pass：293
+* Fail：21
 
-目前先使用這份資料進行分析。
+各方法結果如下：
 
-接著比較 Pass / Fail 各 Feature 的平均值與標準差：
+| Method                   | TP |  FP | FN |  TN |  Recall | Precision | Accuracy | Inspection Rate |
+| ------------------------ | -: | --: | -: | --: | ------: | --------: | -------: | --------------: |
+| Rule-Based Top3          | 20 | 204 |  1 |  89 |  95.24% |     8.93% |   34.71% |          71.34% |
+| Logistic Regression Top3 | 19 | 239 |  2 |  54 |  90.48% |     7.36% |   23.25% |          82.17% |
+| Logistic Balanced Top3   | 21 | 226 |  0 |  67 | 100.00% |     8.50% |   28.03% |          78.66% |
+| Logistic Balanced All    |  3 |  22 | 18 | 271 |  14.29% |    12.00% |   87.26% |           7.96% |
+| Decision Tree All        |  9 | 119 | 12 | 174 |  42.86% |     7.03% |   58.28% |          40.76% |
+| Decision Tree Top3       | 13 |  81 |  8 | 212 |  61.90% |    13.83% |   71.66% |          29.94% |
+| Random Forest All        | 19 | 204 |  2 |  89 |  90.48% |     8.52% |   34.39% |          71.02% |
+| Gradient Boosting All    | 18 | 207 |  3 |  86 |  85.71% |     8.00% |   33.12% |          71.66% |
 
-- `Mean ± 1 SD` 完全不重疊的 Feature：0 個
-- 因不同 Feature 尺度不同，改使用 Cohen's d 比較兩群的相對差異
-- 標準差使用 pooled standard deviation，依 Pass / Fail 各自的變異與樣本數合併
-- 目前較明顯：Feature 59（|d| ≈ 0.64）、Feature 100（|d| ≈ 0.61）
-- 後續可視情況比較 Glass's Δ，以 Pass 的標準差作為正常製程基準
+---
 
-目前先記錄分析結果，不直接以 Cohen's d 作為 Feature 篩選條件。
+## 模型比較結果
 
+這次主要看的是 **Recall 能不能維持 90% 以上，以及需要檢查多少產品**。
 
-## 隨手筆記
-第一階段，評估一下這資料是不是以風險篩檢為目標。
+達到 Recall 90% 以上的主要結果：
 
-### 9/6 分析筆記
+* **Rule-Based Top3**：抓到 20 / 21 個 Fail，Recall 95.24%，Inspection Rate 71.34%
+* **Logistic Regression Top3**：抓到 19 / 21 個 Fail，Recall 90.48%，Inspection Rate 82.17%
+* **Logistic Balanced Top3**：抓到 21 / 21 個 Fail，Recall 100%，Inspection Rate 78.66%
+* **Random Forest All**：抓到 19 / 21 個 Fail，Recall 90.48%，Inspection Rate 71.02%
 
-今天先以單一 Feature 為單位，比較 Pass / Fail 的差異。
+Gradient Boosting 的 Inspection Rate 為 71.66%，但只抓到 18 / 21 個 Fail，Recall 85.71%，沒有達到原本設定的 90% 目標。
 
-- 使用 Cohen's d 將不同尺度的 Feature 標準化後進行比較。
-- 目前沒有 `|d| >= 0.7` 的 Feature，`|d| >= 0.6` 有 2 個、`>= 0.5` 有 5 個、`>= 0.4` 有 15 個。
-- 第一輪人工分析先以前 7 個 Feature 為主，暫時不考慮 Feature 之間的交互作用。
-- 檢查部分低 Cohen's d Feature 時發現極端值可能明顯影響標準差，但若 Pass / Fail 的中心位置仍接近，第一階段先不深入處理 Outlier。
-- 以 Pass 作為正常製程基準，暫時使用 `Pass Mean + Cohen's d × Pass Std` 建立各 Feature 的人工門檻。
+Decision Tree 可以把 Inspection Rate 降得更低，但同時漏掉較多 Fail，因此也沒有達到這次的目標。
 
-將 7 條規則組合後測試：
-- 至少 1 條成立即標記為高風險時，Recall 約 77.8%。
-- 約 45.3% 的產品會被標記，其中不良率（Precision）約 12.2%。
-- 清理後全部資料的不良率約 7.1%，因此目前規則已能將部分不良品集中到較小的檢查範圍，但仍有改善空間。
+另外可以看到 Logistic Balanced All 的 Accuracy 有 87.26%，看起來很高，但實際只抓到 3 / 21 個 Fail，Recall 只有 14.29%。
 
-目前對商業目的的想法也有所調整：
-這個分析不一定要直接取代最終品質檢查，而是可以先利用製程 Feature 做風險篩選。在盡量維持高 Recall、避免漏掉不良品的前提下，降低需要進一步檢查的產品比例。
+這也是這次沒有把 Accuracy 當主要指標的原因。
 
-下一步預計先觀察 7 個 Feature 各自的 Recall、Precision 與誤判情況，再嘗試人工調整各 Feature 的權重與規則。
+![Model Comparison](03_output/model_comparison.png)
 
-### 9/8 分析筆記
-Rule-based 第一階段規則設計：
-以高 Recall 為優先，先建立一個 Gatekeeper（門神）盡可能攔截 Fail，再利用其他候選特徵逐步排除門神誤抓的 Pass，以降低最終 Inspection Rate。初步比較 Cohen's d 篩選出的候選特徵後，Feature 510 在高 Recall 區間具有較好的檢查效率，因此進一步測試 Fail quantile 0～0.10 的門檻變化。結果顯示 q=0.01 時，僅由 100% Recall 降至 98.99%（99 個 Fail 中漏掉 1 個），Inspection Rate 則由 98.995% 降至 94.616%，約減少 4.38 個百分點，因此暫定 Feature 510、q=0.01（threshold ≈ 23.124）作為第一階段 Gatekeeper。後續將針對 Gatekeeper 攔截的樣本，利用其餘候選特徵嘗試釋放 False Positive，並觀察降低 Inspection Rate 時造成的 True Positive 損失。
+圖中越靠左代表 Inspection Rate 越低，越往上代表 Recall 越高，因此左上方是這次希望的方向。
 
-### 9/9 筆記
-第一階段以 Feature 510 作為 Gatekeeper，利用 Fail quantile 尋找高 Recall 門檻，最後將 q=0.009 附近作為主規則設定，使第一階段盡可能保留 Fail。第二階段則使用其餘 4 個候選特徵（59、103、348、431）協助排除 Gatekeeper 誤抓的 Pass，並以 pass_mean + pass_std、pass_mean + 0.5*pass_std、pass_mean 三種統一門檻進行測試。結果顯示門檻越寬鬆，Recall 會提高，但 Inspection Rate 也隨之上升。其中以 pass_mean 作為第二階段門檻、且至少一項特徵成立時，最終 TP=90、FP=968、FN=9、TN=326，Recall=90.91%，Inspection Rate=75.95%。目前暫以此作為人工 Rule-based screening baseline，後續可與 ML 模型在相近 Recall 條件下比較 Inspection Rate。
+---
 
-### 9/11筆記
-### 2026/09/11 Logistic Regression 初步測試
+## 結論
+這次從單一 Feature 的統計分析開始，使用 Cohen's d 找出 Pass / Fail 差異較明顯的 Features，再建立 Rule-Based，最後加入不同 Machine Learning 模型進行比較。
 
-開始進入 ML 分類模型測試，第一階段先使用前述 Cohen's d 篩選出的 Top 5 Features（59、103、510、348、431）建立 Logistic Regression baseline。
+結果可以看到，提高 Recall 通常也會增加 Inspection Rate，兩者之間需要取捨。在這份資料與本次 Test set 中，較複雜的模型並沒有明顯同時改善這兩個指標，Rule-Based 仍有不錯的篩檢效果。
 
-資料以 80/20 分為 Train / Test，並使用 stratified split 維持 Pass / Fail 原始比例。缺失值以 Train data 的 median 進行填補，再使用 StandardScaler 進行標準化，避免不同 Feature 尺度影響模型訓練。
-
-Logistic Regression 訓練完成後，以 `predict_proba()` 取得 Test data 的 Fail probability，並測試不同 probability threshold。在 Recall ≥ 90% 的條件下，目前選定 threshold = 0.032：
-
-- TP = 19
-- FP = 236
-- FN = 2
-- TN = 57
-- Recall = 90.48%
-- Precision = 7.45%
-- Inspection Rate = 81.21%
-
-目前結果先作為 Logistic Regression Top 5 baseline。由於先前人工 Rule-based 結果使用全資料進行規則建立與評估，兩者目前不能直接作公平比較，後續再統一評估方式。
-
-### 09/14 筆記
-
-Logistic Regression 實驗整理
-延續前一階段 Logistic Regression 測試，本次進一步處理類別不平衡與特徵數量問題。
-
-首先使用 `class_weight="balanced"` 重新訓練 Top 5 Features 模型，在 Recall 維持 90.48% 的情況下，Inspection Rate 由原始 Logistic Regression 的 81.21% 降至 74.84%。
-
-接著移除無變化的 constant features 後，將其餘可用特徵全部加入 Balanced Logistic Regression。經 probability threshold 調整，在 Recall ≥ 90% 的條件下，目前最佳結果為：
-
-- TP = 19
-- FP = 206
-- FN = 2
-- TN = 87
-- Recall = 90.48%
-- Precision = 8.44%
-- Inspection Rate = 71.66%
-
-結果顯示，處理類別不平衡後能明顯降低 Inspection Rate，而使用更多製程特徵後又進一步改善篩檢效率。這也表示部分 Cohen's d 單獨效果量不高的特徵，在多變量 Logistic Regression 中仍可能提供額外的分類資訊。
-
-目前 Logistic Regression 實驗先告一段落，後續將重新整理 Rule-based 方法，以相同 Train / Test 資料切分進行較公平的比較。
-
-
-### 9/15筆記
-### 2026/09/15 Rule-Based Train / Test 驗證
-重新整理原本的 Rule-Based screening 方法，改用與 Logistic Regression 相同的 80/20 stratified Train / Test split，避免使用全資料建立規則後又在相同資料上評估。
-
-本次所有規則皆只使用 Train data 建立，包括缺失值中位數填補、Cohen's d 特徵篩選、Gatekeeper threshold 與第二階段人工門檻調整，最後再將固定後的規則套用至 Test data。
-
-Train data 中以 `|Cohen's d| >= 0.5` 篩選出 3 個候選特徵，並以 Feature 510 作為 Gatekeeper，再搭配另外 2 個特徵進行第二階段篩選。
-
-Test data 最終結果：
-
-- TP = 20
-- FP = 204
-- FN = 1
-- TN = 89
-- Recall = 95.24%
-- Precision = 8.93%
-- Inspection Rate = 71.34%
-
-相同 Test set 下，Balanced Logistic Regression（All Features）為 Recall 90.48%、Inspection Rate 71.66%。本次 Rule-Based 在相近 Inspection Rate 下多捕捉 1 筆 Fail，但 Test set 僅有 21 筆 Fail，因此目前僅視為單次 holdout test 結果，不直接推論 Rule-Based 一定優於 Logistic Regression。
-
-後續再考慮使用不同資料切分或 Cross Validation，觀察結果是否穩定。
-
-### 9/21筆記 Decision Tree 與 Random Forest 測試
-
-Decision Tree
-完成 All Features 與 Top3 Features（59、103、510）比較。All Features 在 Test 的 Recall 為 42.86%、Inspection Rate 為 40.76%，且呈現明顯 Train/Test performance gap；縮減至 Top3 後，Test Recall 提升至 61.90%、Inspection Rate 降至 29.94%，Train/Test 差距也縮小。在本次資料切分下，Top3 模型呈現較穩定的泛化表現，但 Recall 仍未達專案設定的高召回目標。
-
-Random Forest
-開始 Random Forest 測試，導入 OOB（Out-of-Bag）作為內部驗證方式，避免直接使用 Test 資料進行模型與 threshold 調整。
-原始 RF 在 Train prediction 上呈現近乎完美的分類結果，但 OOB 表現明顯下降。OOB probability 中 Fail 整體高於 Pass，表示模型具有部分區分能力，但兩者仍有明顯重疊。進一步進行 threshold 掃描後，在 Recall 約 90% 的條件下仍需要較高的 Inspection Rate。
-另外測試 max_depth=5，結果在高 Recall 條件下 Inspection Rate 反而提高，暫未優於原始設定。後續將繼續透過 OOB 調整 Random Forest 參數，目標是在維持高 Recall 的同時降低 Inspection Rate。
-
-### 9/22 筆記
-9/22 Random Forest 與 OOB 調參
-
-完成 Random Forest 模型測試，使用 OOB（Out-of-Bag）作為內部驗證資料，在不使用 Test set 調參的情況下，以 Recall ≥ 90% 為條件，尋找較低的 Inspection Rate。
-
-依序測試 max_depth、min_samples_leaf、max_features 與 n_estimators。結果顯示 max_depth=5 在高 Recall 條件下需要過高的 Inspection Rate；調整 min_samples_leaf 後，以 10 的結果較佳；max_features 則保留預設的 sqrt。最後將樹數增加至 500，以提高 OOB 結果的穩定性。
-
-最終參數採用 n_estimators=500、min_samples_leaf=10、max_features="sqrt"，並依 OOB 結果固定 threshold=0.045，再進行 Test 評估。Test 結果為 Recall 90.48%、Precision 8.52%、Inspection Rate 71.02%。
-
-另外測試移除 116 個無變化特徵，但 OOB 在高 Recall 條件下的 Inspection Rate 未改善，因此保留原始特徵版本。整體而言，Random Forest 達成約 90% Recall，但目前並未明顯優於 Rule-Based 方法。
-
-### 9/23 Gradient Boosting
-
-完成 Gradient Boosting 模型實作，理解 Boosting 與 Random Forest 的差異：Random Forest 透過多棵獨立樹進行整合，而 Gradient Boosting 則依序建立模型，後續 Tree 持續針對目前模型的誤差進行修正。
-
-本次將原 Train 再切分為 Training / Validation，保留 Test 作為最終評估資料。使用 Validation 進行參數與 threshold 選擇，並以 Recall ≥ 90% 為條件，比較不同設定下的 Inspection Rate。
-
-依序測試 max_depth、learning_rate 與 n_estimators，最終採用 max_depth=2、learning_rate=0.05、n_estimators=100。Validation threshold 選定為 0.035，此時 Recall 為 94.1%、Inspection Rate 為 70.1%。
-
-固定模型參數與 threshold 後進行最終 Test，結果為 Recall 85.71%、Precision 8.00%、Inspection Rate 71.66%。Validation 與 Test 的 Inspection Rate 接近，但 Test Recall 下降，顯示 Validation 上的最佳結果不一定能完全延續到未知資料。
+另外，Test set 只有 21 個 Fail，每少抓到 1 個，Recall 就會下降約 4.76 個百分點。因此目前結果主要用來比較不同方法的特性，不直接認定某個模型一定優於其他模型。

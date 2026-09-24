@@ -62,7 +62,7 @@ y_prob = model_balanced.predict_proba(x_train_scaled)
 # print(model_balanced.classes_)
 fail_prob = y_prob[:, 1]
 
-#手動測試門檻
+# 先手動測試 threshold，確認 Recall >= 90% 的門檻大約落在 0.3 ~ 0.5
 threshold=0.340
 pred_fail = fail_prob >= threshold
 TP = ((pred_fail == True)  & (y_train== 1)).sum()
@@ -113,13 +113,13 @@ for threshold in np.arange(0.3, 0.5, 0.001):
 
 logistic_result = pd.DataFrame(result)
 
-# recall 90%以下，誰inspection_rate最低
+# 在 Recall >= 90% 的條件下，選擇 Inspection Rate 最低的 threshold 
 target_result = logistic_result[
-    logistic_result["recall"] >= 0.90
-]
+    logistic_result["recall"] >= 0.90]
+best_result = target_result.loc[
+    target_result["inspection_rate"].idxmin()]
+threshold = best_result["threshold"]
 
-#後來以threshold =0.0328為值，用測試資料做最後結果。
-threshold = target_result["threshold"].max()
 y_test_prob = model_balanced.predict_proba(x_test_scaled)
 fail_prob_test = y_test_prob[:, 1]
 pred_fail_test = fail_prob_test >= threshold
@@ -146,3 +146,4 @@ print(f"inspection_rate：{inspection_rate:.2%}")
 
 
 save_result("logistic_balance_top3", TP, FP, FN, TN)
+# %%
