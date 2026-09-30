@@ -4,21 +4,9 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import pandas as pd
 from sqlalchemy import create_engine
+from sqlalchemy import text
 
 engine = create_engine("mysql+pymysql://root:123456@localhost/financial_news")
-
-news_df.to_sql(
-    name="raw_news",
-    con=engine,
-    if_exists="append",
-    method=IGNORE,
-    index=False
-)
-df = pd.read_sql(
-    "SELECT * FROM raw_news",
-    engine
-)
-cursor = conn.cursor()
 
 # 經濟日報
 url = "https://money.udn.com/money/index"
@@ -51,14 +39,14 @@ for i, link in enumerate(links) :
     paragraphs = article_body.find_all("p", recursive=False)
     content_list = []
     for p in paragraphs:
-        text = p.text.strip()
+        p_text = p.text.strip()
         if ( 
-            text
+            p_text 
             and not p.find(class_="further-reading")
             and not p.find("a", attrs={"data-slotname": "list_文中延伸閱讀"})
             and not p.find(class_="ai_content_block")
             ):
-            content_list.append(text)
+            content_list.append(p_text )
     content = "\n".join(content_list)
     news_list.append({
         "title" : article_title,
@@ -75,69 +63,22 @@ news_df["published_at"] = pd.to_datetime(
     news_df["published_at"])
 news_df["source"] = "經濟日報"
 
+# def insert_ignore(table, conn, keys, data_iter):
+#     pass
+
+#因為有設定唯一clean_url，所以一般insert遇到同資料會報錯，而且會停止輸入
+#要用 IGNORE，但pandas套件沒直接支援。
+sql = text("""
+INSERT IGNORE INTO raw_news
+(title, published_at, url, content, clean_url, source)
+VALUES
+(:title, :published_at, :url, :content, :clean_url, :source)
+""")
+data =  news_df.to_dict(orient="records")
+with engine.begin() as conn:
+    result = conn.execute(sql, data)
+result.rowcount
 
 
-
-## 下面指令測試用
-news_df["title"].str.len().max()
-news_df["url"].str.len().max()
-news_df["clean_url"].str.len().max()
-news_df["content"].str.len().max()
-
-links[22]
-print(article_url)
-print(article_url)
-
-article_time.text.strip()
-print(article_time)
-print()
-
-
-
-
-article_url = links[0].get("href")
-article_title = links[0].get("title")
-
-
-test_response = requests.get(
-    "https://money.udn.com/money/get_article/4/1001/5591/11162?_=1790600658361",
-    timeout=10
-)
-
-print(test_response.status_code)
-print(test_response.text[:1000])
-
-
-article_soup = BeautifulSoup(
-    article_response.text,"html.parser")
-article_body = article_soup.find("section", id="article_body")
-
-paragraphs = article_body.find_all("p", recursive=False)
-content_list = []
-
-for p in paragraphs:
-    text = p.text.strip()
-
-    if (
-        text
-        and not p.find(class_="further-reading")
-        and not p.find("a", attrs={"data-slotname": "list_文中延伸閱讀"})
-        and not p.find(class_="ai_content_block")
-    ):
-        content_list.append(text)
-content = "\n".join(content_list)
-
-print(article_title)
-print(article_url)
-print(content)
-
-df = pd.DataFrame([{
-    "title": article_title,
-    "url": article_url,
-    "content": content
-}])
-
-
-print(df)
         
 # %%
