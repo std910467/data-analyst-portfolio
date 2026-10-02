@@ -20,6 +20,7 @@
 * Power BI 互動式儀表板
 
 📁 [查看專案](./01.ECommerce_date_analyst/)
+
 ---
 
 ### 02. Equipment Maintenance Analysis
@@ -34,6 +35,7 @@
 * Power BI 設備維運儀表板
 
 📁 [查看專案](./02.Equipment_Maintenance_Analysis/)
+
 ---
 
 ### 03. Semiconductor Manufacturing Quality Analysis (SECOM)
