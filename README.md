@@ -20,6 +20,7 @@
 * Power BI 互動式儀表板
 
 📁 [查看專案](./01.ECommerce_data_analyst/)
+📁 [查看專案](./01.ECommerce_date_analyst/)
 
 ---
 
