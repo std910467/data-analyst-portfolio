@@ -18,7 +18,6 @@ links = soup.find_all(
     "a",attrs={"data-slotname": lambda x: x and "list_" in x})
 news_list = []
 for i, link in enumerate(links) :
-    print(i)
     article_url = urljoin(url, link.get("href"))
     article_title = link.get("title")
     try:
@@ -53,7 +52,7 @@ for i, link in enumerate(links) :
         "published_at": article_time,
         "url" : article_url,
         "content" : content})
-    
+print("完成爬文")
 news_df = pd.DataFrame(news_list)
 news_df["clean_url"] = news_df["url"].str.split("?").str[0]
 news_df = news_df.drop_duplicates(
