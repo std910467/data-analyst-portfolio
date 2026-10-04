@@ -3,8 +3,8 @@ import requests
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import pandas as pd
-from sqlalchemy import create_engine
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+
 
 engine = create_engine("mysql+pymysql://root:123456@localhost/financial_news")
 
@@ -62,8 +62,7 @@ news_df["published_at"] = pd.to_datetime(
     news_df["published_at"])
 news_df["source"] = "經濟日報"
 
-# def insert_ignore(table, conn, keys, data_iter):
-#     pass
+
 
 #因為有設定唯一clean_url，所以一般insert遇到同資料會報錯，而且會停止輸入
 #要用 IGNORE，但pandas套件沒直接支援。
@@ -76,8 +75,8 @@ VALUES
 data =  news_df.to_dict(orient="records")
 with engine.begin() as conn:
     result = conn.execute(sql, data)
-result.rowcount
-
-
+print("經濟日報")
+print(f"Fetched {len(news_df)} records.")
+print(f"Inserted {result.rowcount} new records.")
         
 # %%

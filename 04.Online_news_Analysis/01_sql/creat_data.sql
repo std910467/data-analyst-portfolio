@@ -4,9 +4,10 @@ SHOW DATABASES;
 
 USE financial_news;
 
+
 -- 創造空表格，讓py輸入資料使用
 
--- 先創造對應的空表格
+-- 先創造網路原始文章存放的空表格
 CREATE TABLE raw_news (
     news_id      INT AUTO_INCREMENT PRIMARY KEY,
     title 	VARCHAR(255) NOT null,
@@ -17,8 +18,25 @@ CREATE TABLE raw_news (
     source	VARCHAR(25) NOT null
 );
 
--- 看一下內容~一開始應該是空的
-SELECT *
-FROM raw_news;
+-- 先創造LLM解析完存放的空表格
+CREATE TABLE news_industry (
+    news_id      INT NOT null,
+    industry 	VARCHAR(255) NOT null,
+    UNIQUE (news_id, industry)
+);
+
+CREATE TABLE news_company (
+    news_id      INT NOT null,
+    company 	VARCHAR(255) NOT null,
+    UNIQUE (news_id, company)
+);
+
+CREATE TABLE news_keyword (
+    news_id      INT NOT null,
+    keyword 	VARCHAR(255) NOT null,
+    UNIQUE (news_id, keyword)
+);
+
+
 --刪除表格
-drop table raw_orders ;
+drop table XXXXXXXXXXXXX ;
