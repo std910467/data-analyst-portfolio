@@ -127,39 +127,4 @@ print(f"company fetched {len(company_list)} records.")
 print(f"company inserted {result.rowcount} new records.")
 
 
-# 下面是測試用的指令
-tables = pd.read_sql("SHOW TABLES", engine)
-print(tables)
-
-response = client.models.generate_content(
-    model="gemini-3.5-flash-lite",
-    contents=prompt,
-    config={
-        "response_mime_type": "application/json",
-        "response_schema": NewsAnalysis,
-    }
-)
-response.parsed
-
-# model="gemini-3.5-flash-lite"
-# model="gemini-3.8-flash"
-industry_list=[]
-print(response.text)
-print(response.parsed)
-response.text[10]
-response.parsed.industry
-
-industry.append(response.parsed.industry)
-news_id=1
-for industry in response.parsed.industry:
-    industry_list.append({
-        "news_id": news_id,
-        "industry": industry
-    })
-industry_df = pd.DataFrame(industry_list)
-print(industry_df)
-
-print(response.parsed.industry)
-print(response.parsed.companies)
-print(response.parsed.keywords)
 # %%
