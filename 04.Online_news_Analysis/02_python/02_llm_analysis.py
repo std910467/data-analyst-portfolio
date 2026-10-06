@@ -32,11 +32,27 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
-industry_list = []
-company_list = []
-keyword_list = []
-print(f"Total news:{len(df)}")
+sql_industry = text("""
+INSERT IGNORE INTO news_industry
+(news_id, industry )
+VALUES
+(:news_id, :industry)
+""")
+sql_keyword = text("""
+INSERT IGNORE INTO news_keyword
+(news_id, keyword)
+VALUES
+(:news_id, :keyword)
+""")
+sql_company = text("""
+INSERT IGNORE INTO news_company
+(news_id, company)
+VALUES
+(:news_id, :company)
+""")
 
+print(f"Total news:{len(df)}")
+insert_times = 0
 for i, row in df.iterrows():
     news_id = row["news_id"]
     title = row["title"]
@@ -72,59 +88,29 @@ for i, row in df.iterrows():
         print(f"news_id {news_id} failed: {e}")
         continue
     finally:
-        time.sleep(5)   
-        
-    for industry in response.parsed.industry:
-        industry_list.append({
-            "news_id": news_id,
-            "industry": industry
-        })
-    for company in response.parsed.companies:
-        company_list.append({
-            "news_id": news_id,
-            "company": company
-        })
-    for keyword in response.parsed.keywords:
-        keyword_list.append({
-            "news_id": news_id,
-            "keyword": keyword
-        })
+        time.sleep(5)
+    try:
+        with engine.begin() as conn:  
+            for industry in response.parsed.industry:       
+                conn.execute(sql_industry, {
+                    "news_id": news_id,
+                    "industry": industry
+                })
+            for company in response.parsed.companies:
+                conn.execute(sql_company, {
+                    "news_id": news_id,
+                    "company": company
+                })
+            for keyword in response.parsed.keywords:
+                conn.execute(sql_keyword, {
+                    "news_id": news_id,
+                    "keyword": keyword
+                })
+    except Exception as e:
+        print(f"news_id {news_id} insert SQL failed: {e}")
+        continue
+    insert_times +=1
 
-#因為有設定唯一(new_id,XXXX)，所以一般insert遇到同資料會報錯，而且會停止輸入
-#要用 IGNORE，但pandas套件沒直接支援。
-sql = text("""
-INSERT IGNORE INTO news_industry
-(news_id, industry )
-VALUES
-(:news_id, :industry)
-""")
-# data =  news_df.to_dict(orient="records")
-with engine.begin() as conn:
-    result = conn.execute(sql, industry_list)
-print(f"industry fetched {len(industry_list)} records.")
-print(f"industry inserted {result.rowcount} new records.")
-
-sql = text("""
-INSERT IGNORE INTO news_keyword
-(news_id, keyword)
-VALUES
-(:news_id, :keyword)
-""")
-with engine.begin() as conn:
-    result = conn.execute(sql, keyword_list)
-print(f"keyword fetched {len(keyword_list)} records.")
-print(f"keyword inserted {result.rowcount} new records.")
-
-sql = text("""
-INSERT IGNORE INTO news_company
-(news_id, company)
-VALUES
-(:news_id, :company)
-""")
-with engine.begin() as conn:
-    result = conn.execute(sql, company_list)
-print(f"company fetched {len(company_list)} records.")
-print(f"company inserted {result.rowcount} new records.")
-
-
+print(f"Total news: {len(df)}")
+print(f"Inserted: {insert_times} news")
 # %%
