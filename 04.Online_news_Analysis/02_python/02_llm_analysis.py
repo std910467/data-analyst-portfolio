@@ -6,6 +6,7 @@ from google import genai
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from enum import Enum
 import time
 
 ## 載入SQLraw_news資料
@@ -22,8 +23,26 @@ df = pd.read_sql("""
 )
 """, engine)
 ## 設定LLM輸出的格式
+class Industry(str, Enum):
+    ENERGY = "能源"
+    MATERIALS = "原物料"
+    INDUSTRIALS = "工業"
+    CONSUMER_DISCRETIONARY = "非必需消費"
+    CONSUMER_STAPLES = "必需消費"
+    HEALTH_CARE = "醫療保健"
+    FINANCIALS = "金融"
+    INFORMATION_TECHNOLOGY = "資訊科技"
+    COMMUNICATION_SERVICES = "通訊服務"
+    UTILITIES = "公用事業"
+    REAL_ESTATE = "不動產"
+    OTHER = "其他"
+
+class IndustryItem(BaseModel):
+    sub_industry: str
+    main_industry: Industry
+
 class NewsAnalysis(BaseModel):
-    industry: list[str]
+    industries: list[IndustryItem]
     companies: list[str]
     keywords: list[str]
 
@@ -62,7 +81,11 @@ for i, row in df.iterrows():
     prompt = f"""
     請分析以下財經新聞。
     要求：
-    1. industry：判斷新聞涉及的產業，可有多個。
+    1. industry：
+        判斷新聞涉及的細分產業，可有多個。
+        每個 sub_industry 都必須同時指定 main_industry。
+        main_industry 必須從 Schema 允許的 GICS 大分類中選擇。
+        若無法合理歸類，使用「其他」。
     2. companies：列出新聞涉及的公司，只包含企業，不包含政府、國家、人物或組織。
     3. keywords：選出 3～5 個最能代表新聞核心事件或議題的關鍵字，
     避免單純使用國家、人物、公司名稱作為關鍵字。
@@ -89,26 +112,28 @@ for i, row in df.iterrows():
         continue
     finally:
         time.sleep(5)
-    try:
-        with engine.begin() as conn:  
-            for industry in response.parsed.industry:       
-                conn.execute(sql_industry, {
-                    "news_id": news_id,
-                    "industry": industry
-                })
-            for company in response.parsed.companies:
-                conn.execute(sql_company, {
-                    "news_id": news_id,
-                    "company": company
-                })
-            for keyword in response.parsed.keywords:
-                conn.execute(sql_keyword, {
-                    "news_id": news_id,
-                    "keyword": keyword
-                })
-    except Exception as e:
-        print(f"news_id {news_id} insert SQL failed: {e}")
-        continue
+    for industry in response.parsed.industries:
+        print(industry.sub_industry, "→", industry.main_industry.value)
+    # try:
+    #     with engine.begin() as conn:  
+    #         for industry in response.parsed.industry:       
+    #             conn.execute(sql_industry, {
+    #                 "news_id": news_id,
+    #                 "industry": industry
+    #             })
+    #         for company in response.parsed.companies:
+    #             conn.execute(sql_company, {
+    #                 "news_id": news_id,
+    #                 "company": company
+    #             })
+    #         for keyword in response.parsed.keywords:
+    #             conn.execute(sql_keyword, {
+    #                 "news_id": news_id,
+    #                 "keyword": keyword
+    #             })
+    # except Exception as e:
+    #     print(f"news_id {news_id} insert SQL failed: {e}")
+    #     continue
     insert_times +=1
 
 print(f"Total news: {len(df)}")
