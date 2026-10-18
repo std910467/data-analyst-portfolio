@@ -12,16 +12,21 @@ import time
 ## 載入SQLraw_news資料
 engine = create_engine("mysql+pymysql://root:123456@localhost/financial_news")
 
-# 讀取尚未進行 LLM 分析的新聞，排除已存在於 news_keyword 的 news_id
+# 讀取V2尚未進行 LLM 分析的新聞，排除已存在於 news_keyword 的 news_id
 df = pd.read_sql("""
     SELECT r.*
     FROM raw_news r
     WHERE NOT EXISTS (
         SELECT *
-        FROM news_keyword k
+        FROM news_keyword_v2 k
         WHERE k.news_id = r.news_id
+    order by r.news_id
 )
 """, engine)
+
+## 避免依次跑太多先100則就好
+df = df.head(100)
+
 ## 設定LLM輸出的格式
 class Industry(str, Enum):
     ENERGY = "能源"
@@ -52,31 +57,30 @@ api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
 sql_industry = text("""
-INSERT IGNORE INTO news_industry
-(news_id, industry )
+INSERT IGNORE INTO news_industry_v2
+(news_id, sub_industry , main_industry )
 VALUES
-(:news_id, :industry)
+(:news_id, :sub_industry , :main_industry)
 """)
 sql_keyword = text("""
-INSERT IGNORE INTO news_keyword
+INSERT IGNORE INTO news_keyword_v2
 (news_id, keyword)
 VALUES
 (:news_id, :keyword)
 """)
 sql_company = text("""
-INSERT IGNORE INTO news_company
+INSERT IGNORE INTO news_company_v2
 (news_id, company)
 VALUES
 (:news_id, :company)
 """)
-
 print(f"Total news:{len(df)}")
 insert_times = 0
 for i, row in df.iterrows():
     news_id = row["news_id"]
     title = row["title"]
     content = row["content"]
-    print(f"Processing news_id: {news_id}")
+    print(f"Processing article #{insert_times + 1}, news_id: {news_id}")
     ## 設定詢問的問題
     prompt = f"""
     請分析以下財經新聞。
@@ -105,35 +109,39 @@ for i, row in df.iterrows():
         )
 
     # 避免LLM 頻繁詢問出錯，每次問完間隔5秒
-# model="gemini-3.5-flash-lite"
-# model="gemini-3.8-flash"
+    # model="gemini-3.5-flash-lite"
+    # model="gemini-3.8-flash"
     except Exception as e:
         print(f"news_id {news_id} failed: {e}")
         continue
     finally:
         time.sleep(5)
-    for industry in response.parsed.industries:
-        print(industry.sub_industry, "→", industry.main_industry.value)
-    # try:
-    #     with engine.begin() as conn:  
-    #         for industry in response.parsed.industry:       
-    #             conn.execute(sql_industry, {
-    #                 "news_id": news_id,
-    #                 "industry": industry
-    #             })
-    #         for company in response.parsed.companies:
-    #             conn.execute(sql_company, {
-    #                 "news_id": news_id,
-    #                 "company": company
-    #             })
-    #         for keyword in response.parsed.keywords:
-    #             conn.execute(sql_keyword, {
-    #                 "news_id": news_id,
-    #                 "keyword": keyword
-    #             })
-    # except Exception as e:
-    #     print(f"news_id {news_id} insert SQL failed: {e}")
-    #     continue
+
+    if response.parsed is None:
+        print(f"news_id {news_id} parsing failed")
+        continue
+
+    try:
+        with engine.begin() as conn:  
+            for industry in response.parsed.industries:       
+                conn.execute(sql_industry, {
+                    "news_id": news_id,
+                    "sub_industry": industry.sub_industry,
+                    "main_industry":industry.main_industry.value
+                })
+            for company in response.parsed.companies:
+                conn.execute(sql_company, {
+                    "news_id": news_id,
+                    "company": company
+                })
+            for keyword in response.parsed.keywords:
+                conn.execute(sql_keyword, {
+                    "news_id": news_id,
+                    "keyword": keyword
+                })
+    except Exception as e:
+        print(f"news_id {news_id} insert SQL failed: {e}")
+        continue
     insert_times +=1
 
 print(f"Total news: {len(df)}")

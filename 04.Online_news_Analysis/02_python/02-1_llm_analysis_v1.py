@@ -25,7 +25,6 @@ df = pd.read_sql("""
 
 print(f"Total news:{len(df)}")
 
-print(df["news_id"])
 ## 設定LLM輸出的格式
 class NewsAnalysis(BaseModel):
     industries: list[str]
