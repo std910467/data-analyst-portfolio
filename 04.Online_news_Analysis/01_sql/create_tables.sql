@@ -25,6 +25,11 @@ CREATE TABLE news_industry (
     UNIQUE (news_id, industry)
 );
 
+--新增欄位 normalized_industry 提供給人工標準化使用
+ALTER TABLE news_industry
+ADD COLUMN normalized_industry VARCHAR(255);
+
+
 CREATE TABLE news_company (
     news_id      INT NOT null,
     company 	VARCHAR(255) NOT null,
@@ -32,27 +37,6 @@ CREATE TABLE news_company (
 );
 
 CREATE TABLE news_keyword (
-    news_id      INT NOT null,
-    keyword 	VARCHAR(255) NOT null,
-    UNIQUE (news_id, keyword)
-);
-
--- 創造LLM解析完存放的空表格_V2版本
-CREATE TABLE news_industry_v2 (
-    news_id INT NOT NULL,
-    sub_industry VARCHAR(255) NOT NULL,
-    main_industry VARCHAR(50) NOT NULL,
-    UNIQUE (news_id, sub_industry, main_industry)
-);
-
-
-CREATE TABLE news_company_v2 (
-    news_id      INT NOT null,
-    company 	VARCHAR(255) NOT null,
-    UNIQUE (news_id, company)
-);
-
-CREATE TABLE news_keyword_v2 (
     news_id      INT NOT null,
     keyword 	VARCHAR(255) NOT null,
     UNIQUE (news_id, keyword)

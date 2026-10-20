@@ -38,6 +38,25 @@ CREATE TABLE news_keyword_v2 (
 );
 
 
-
 --刪除表格
 drop table XXXXXXXXXXXXX ;
+
+
+
+
+-- 搜尋特定字串，並計算數量
+SELECT normalized_industry, COUNT(*) AS industry_count
+FROM news_industry
+WHERE normalized_industry LIKE '%半導體%'
+GROUP BY normalized_industry
+ORDER BY industry_count DESC;
+
+查看同news_id裡面人工標準化內容是否有重複
+SELECT
+    news_id,
+    normalized_industry,
+    COUNT(*) AS cnt
+FROM news_industry
+GROUP BY news_id, normalized_industry
+HAVING COUNT(*) > 1
+ORDER BY cnt DESC, news_id;
